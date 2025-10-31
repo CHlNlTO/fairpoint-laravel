@@ -6,11 +6,11 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class TaxType extends Model
+class TaxCategory extends Model
 {
     use HasFactory, HasUuids;
 
-    protected $table = 'tax_types';
+    protected $table = 'tax_categories';
 
     protected $primaryKey = 'id';
     public $incrementing = false;
@@ -21,12 +21,9 @@ class TaxType extends Model
         'description',
         'hint',
         'is_active',
-        'category_id',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
     ];
-
-    public function taxCategory() { return $this->belongsTo(TaxCategory::class, 'category_id'); }
 }

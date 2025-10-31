@@ -32,7 +32,7 @@ class AccountTypeResource extends Resource
 
     public static function table(Table $table): Table
     {
-        // return AccountTypesTable::configure($table);
+        return AccountTypesTable::configure($table);
     }
 
     public static function getPages(): array

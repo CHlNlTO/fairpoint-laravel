@@ -1,24 +1,24 @@
 <?php
 
-namespace App\Filament\Resources\AccountTypes\Schemas;
+namespace App\Filament\Resources\AccountSubtypes\Schemas;
 
 use Filament\Schemas\Schema;
 use Filament\Forms;
 use Filament\Schemas\Components\Section;
 
-class AccountTypeForm
+class AccountSubtypeForm
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
                 Section::make('Basic Information')
-                    ->description('Type details and ownership rules.')
+                    ->description('Subtype details and ownership rules.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Select::make('account_subclass_id')
-                            ->label('Account Subclass')
-                            ->relationship('accountSubclass', 'name')
+                        Forms\Components\Select::make('account_type_id')
+                            ->label('Account Type')
+                            ->relationship('accountType', 'name')
                             ->searchable()
                             ->preload()
                             ->required(),

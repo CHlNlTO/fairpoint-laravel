@@ -15,7 +15,7 @@ return new class extends Migration
         Schema::create('account_types', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->uuid('account_subclass_id');
-            $table->uuid('user_id')->nullable();
+            $table->bigInteger('user_id')->nullable();
             $table->uuid('business_registration_id')->nullable();
             $table->string('name', 100);
             $table->boolean('is_active')->default(true);
@@ -44,7 +44,7 @@ return new class extends Migration
                 ->onDelete('cascade');
         });
 
-        DB::statement('ALTER TABLE account_types ADD CONSTRAINT account_types_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE');
+        DB::statement('ALTER TABLE account_types ADD CONSTRAINT account_types_user_id_fkey FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE');
         DB::statement('ALTER TABLE account_types ADD CONSTRAINT account_types_user_or_business_check CHECK (( (is_system_defined = true AND user_id IS NULL AND business_registration_id IS NULL) OR (is_system_defined = false AND (user_id IS NOT NULL OR business_registration_id IS NOT NULL)) ))');
         DB::statement('ALTER TABLE account_types ADD CONSTRAINT account_types_code_range CHECK (code >= 1 AND code <= 99)');
     }

@@ -29,7 +29,7 @@ class FiscalYearPeriodResource extends Resource
     {
         return FiscalYearPeriodForm::configure($schema);
     }
-
+    
     public static function table(Table $table): Table
     {
         return FiscalYearPeriodsTable::configure($table);

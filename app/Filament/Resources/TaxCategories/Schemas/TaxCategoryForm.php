@@ -1,30 +1,25 @@
 <?php
 
-namespace App\Filament\Resources\TaxTypes\Schemas;
+namespace App\Filament\Resources\TaxCategories\Schemas;
 
 use Filament\Schemas\Schema;
 use Filament\Forms;
 use Filament\Schemas\Components\Section;
 
-class TaxTypeForm
+class TaxCategoryForm
 {
     public static function configure(Schema $schema): Schema
     {
         return $schema
             ->components([
                 Section::make('Basic Information')
-                    ->description('Tax type name and visibility settings.')
+                    ->description('Tax category name and visibility settings.')
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('name')
-                        ->label('Name')
-                        ->required()
-                        ->maxLength(100),
-                        Forms\Components\Select::make('category_id')
-                            ->label('Category')
-                            ->relationship('taxCategory', 'name')
-                            ->searchable()
-                            ->preload(),
+                            ->label('Name')
+                            ->required()
+                            ->maxLength(100),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->inlineLabel()

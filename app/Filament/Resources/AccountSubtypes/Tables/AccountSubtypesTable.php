@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\AccountTypes\Tables;
+namespace App\Filament\Resources\AccountSubtypes\Tables;
 
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -13,14 +13,14 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 
-class AccountTypesTable
+class AccountSubtypesTable
 {
     public static function configure(Table $table): Table
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('accountSubclass.name')
-                    ->label('Subclass')
+                Tables\Columns\TextColumn::make('accountType.name')
+                    ->label('Type')
                     ->sortable()
                     ->searchable(),
                 Tables\Columns\TextColumn::make('code')
@@ -43,9 +43,9 @@ class AccountTypesTable
                     ->since(),
             ])
             ->filters([
-                SelectFilter::make('account_subclass_id')
-                    ->label('Subclass')
-                    ->relationship('accountSubclass', 'name'),
+                SelectFilter::make('account_type_id')
+                    ->label('Type')
+                    ->relationship('accountType', 'name'),
                 TernaryFilter::make('is_active')->label('Active'),
                 TernaryFilter::make('is_system_defined')->label('System defined'),
             ])
