@@ -1,59 +1,184 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Fairpoint v2 - Laravel Filament Setup Guide
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## Prerequisites
 
-## About Laravel
+- PHP 8.2 or higher
+- Composer
+- Node.js & pnpm (or npm)
+- Database PostgreSQL
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Installation
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### 1. Clone and Install Dependencies
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```bash
+composer install
+```
 
-## Learning Laravel
+### 2. Environment Configuration
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+Copy the `.env.example` file to `.env` (if not already present):
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```bash
+cp .env.example .env
+```
 
-## Laravel Sponsors
+Update your `.env` file with your database credentials:
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+```env
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=fairpoint
+DB_USERNAME=postgres
+DB_PASSWORD=postgres
+```
 
-### Premium Partners
+### 3. Generate Application Key
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+```bash
+php artisan key:generate
+```
 
-## Contributing
+### 4. Run Migrations
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan migrate
+```
 
-## Code of Conduct
+### 5. Seed Database
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+#### 5a. Seed Yajra Address Data
 
-## Security Vulnerabilities
+Seed the Philippines address lookup data (regions, provinces, cities, barangays):
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+```bash
+php artisan db:seed --class="Yajra\Address\Seeders\AddressSeeder"
+```
 
-## License
+#### 5b. Seed Application Data
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Seed the application's initial data (account classes, business types, tax categories, etc.):
+
+```bash
+php artisan db:seed --class="Database\Seeders\DatabaseSeeder"
+```
+
+Or seed all at once:
+
+```bash
+php artisan db:seed
+```
+
+### 6. Install and Build Frontend Assets
+
+```bash
+pnpm install
+pnpm run build
+```
+
+Or if using npm:
+
+```bash
+npm install
+npm run build
+```
+
+### 7. Filament Shield Setup
+
+#### 7a. Install Shield (First Time Only)
+
+If Shield is not yet installed, run:
+
+```bash
+php artisan shield:install
+```
+
+This will register the Shield plugin and publish necessary files.
+
+#### 7b. Generate Permissions
+
+Generate permissions for all Filament resources, pages, and widgets:
+
+```bash
+php artisan shield:generate --all
+```
+
+Or generate for specific resources:
+
+```bash
+php artisan shield:generate
+```
+
+#### 7c. Create Super Admin User
+
+Create a super admin user with full access:
+
+```bash
+php artisan shield:super-admin
+```
+
+Follow the prompts to enter:
+- Name
+- Email
+- Password
+
+Alternatively, you can create a Filament user and manually assign roles:
+
+```bash
+php artisan make:filament-user
+```
+
+### 8. Quick Setup (All-in-One)
+
+You can also use the setup script that runs most of the above steps:
+
+```bash
+composer run setup
+```
+
+**Note:** This script runs:
+- `composer install`
+- Copies `.env.example` to `.env` (if missing)
+- `php artisan key:generate`
+- `php artisan migrate --force`
+- `pnpm install`
+- `pnpm run build`
+
+**Important:** After running `composer run setup`, you still need to:
+1. Configure your `.env` file with database credentials
+2. Run the seeders (Yajra Address + DatabaseSeeder) - see steps 5a and 5b
+3. Run `php artisan shield:generate --all` - see step 7b
+4. Create a super admin user - see step 7c
+
+## Development
+
+### Start Development Server
+
+```bash
+composer run dev
+```
+
+This will start:
+- Laravel development server
+- Queue worker
+- Vite dev server
+
+### Run Tests
+
+```bash
+composer run test
+```
+
+## Additional Notes
+
+- **Address Data**: The Yajra Address seeder populates regions, provinces, cities, and barangays tables. This may take a few minutes.
+- **Permissions**: After creating new Filament resources, run `php artisan shield:generate --all` to create permissions.
+- **Storage Link**: If you need public file storage, run `php artisan storage:link`.
+- **Cache**: Clear cache after configuration changes: `php artisan config:clear && php artisan cache:clear`
+
+## Troubleshooting
+
+- **Migration Issues**: If migrations fail, ensure your database is created and credentials are correct.
+- **Permission Errors**: Make sure storage and bootstrap/cache directories are writable.
+- **Asset Issues**: Clear Vite cache: `rm -rf node_modules/.vite` and rebuild.
