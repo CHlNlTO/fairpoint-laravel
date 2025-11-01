@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\COATemplateItems;
 
 use App\Filament\Resources\COATemplateItems\Pages\CreateCOATemplateItem;
+use App\Filament\Resources\COATemplateItems\Pages\CustomCreateCOATemplateItem;
 use App\Filament\Resources\COATemplateItems\Pages\EditCOATemplateItem;
 use App\Filament\Resources\COATemplateItems\Pages\ListCOATemplateItems;
 use App\Filament\Resources\COATemplateItems\Pages\ViewCOATemplateItem;
@@ -29,6 +30,7 @@ class COATemplateItemResource extends Resource
     protected static ?string $pluralNavigationLabel = 'Chart of Account Items';
     protected static ?string $pluralModelLabel = 'Chart of Account Items';
     protected static ?string $modelLabel = 'Chart of Account Item';
+    protected static ?string $slug = 'chart-of-account-items';
 
     public static function form(Schema $schema): Schema
     {
@@ -51,7 +53,7 @@ class COATemplateItemResource extends Resource
     {
         return [
             'index' => ListCOATemplateItems::route('/'),
-            'create' => CreateCOATemplateItem::route('/create'),
+            'create' => CustomCreateCOATemplateItem::route('/create'),
             'edit' => EditCOATemplateItem::route('/{record}/edit'),
             'view' => ViewCOATemplateItem::route('/{record}'),
         ];

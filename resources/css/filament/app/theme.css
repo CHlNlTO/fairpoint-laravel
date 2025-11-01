@@ -1,0 +1,10 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+@source '../../../../resources/views/livewire/**/*';
+
+.fi-main-ctn {
+    @apply relative flex w-full flex-1 flex-col bg-white dark:bg-black m-2 md:ml-0 md:rounded-xl md:shadow-sm
+
+}
