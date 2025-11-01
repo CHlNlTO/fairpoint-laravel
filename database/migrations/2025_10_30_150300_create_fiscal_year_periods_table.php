@@ -22,8 +22,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->boolean('is_default')->default(false);
             $table->boolean('is_active')->default(true);
-            $table->timestampTz('created_at')->useCurrent();
-            $table->timestampTz('updated_at')->useCurrent();
+            $table->timestampsTz();
 
             $table->unique('name', 'fiscal_year_periods_name_key');
             $table->index('is_active', 'idx_fiscal_year_periods_active');

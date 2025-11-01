@@ -54,7 +54,10 @@ class AppPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             ->plugins([
-                FilamentShieldPlugin::make(),
+                FilamentShieldPlugin::make()
+                ->navigationLabel('Roles and Permissions')
+                ->navigationSort(10)
+                ->navigationGroup('Manage Permissions')
             ])
             ->topbar(false)
             ->globalSearch(false)

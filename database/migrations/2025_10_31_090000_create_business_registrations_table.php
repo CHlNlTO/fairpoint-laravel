@@ -33,8 +33,7 @@ return new class extends Migration
             $table->string('postal_code', 10)->nullable();
 
             $table->boolean('is_active')->default(true);
-            $table->timestampTz('created_at')->useCurrent();
-            $table->timestampTz('updated_at')->useCurrent();
+            $table->timestampsTz();
 
             $table->index('user_id', 'idx_business_registrations_user_id');
             $table->index('tin_number', 'idx_business_registrations_tin_number');

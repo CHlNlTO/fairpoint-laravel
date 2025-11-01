@@ -22,6 +22,8 @@ return new class extends Migration
             $table->foreign('industry_type_id')
                 ->references('id')->on('industry_types')
                 ->onDelete('cascade');
+
+            $table->timestampsTz();
         });
     }
 
