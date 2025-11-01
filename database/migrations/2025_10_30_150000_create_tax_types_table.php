@@ -18,8 +18,7 @@ return new class extends Migration
             $table->string('description', 500)->nullable();
             $table->string('hint', 200)->nullable();
             $table->boolean('is_active')->default(true);
-            $table->timestampTz('created_at')->useCurrent();
-            $table->timestampTz('updated_at')->useCurrent();
+            $table->timestampsTz();
 
             $table->unique('name', 'tax_types_name_unique');
             $table->index('is_active', 'idx_tax_types_active');

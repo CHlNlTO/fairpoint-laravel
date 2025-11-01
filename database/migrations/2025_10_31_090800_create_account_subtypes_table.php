@@ -22,8 +22,7 @@ return new class extends Migration
             $table->boolean('is_system_defined')->default(true);
             $table->string('description', 500)->nullable();
             $table->string('hint', 200)->nullable();
-            $table->timestampTz('created_at')->useCurrent();
-            $table->timestampTz('updated_at')->useCurrent();
+            $table->timestampsTz();
             $table->unsignedInteger('code');
 
             $table->unique(['account_type_id', 'code'], 'account_subtypes_code_unique_per_type');

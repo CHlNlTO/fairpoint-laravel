@@ -17,8 +17,7 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->string('description', 500)->nullable();
             $table->string('hint', 200)->nullable();
-            $table->timestampTz('created_at')->useCurrent();
-            $table->timestampTz('updated_at')->useCurrent();
+            $table->timestampsTz();
 
             $table->unique('code');
             $table->index('code', 'idx_account_classes_code');

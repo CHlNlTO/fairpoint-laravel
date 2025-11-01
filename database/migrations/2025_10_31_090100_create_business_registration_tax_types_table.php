@@ -22,6 +22,8 @@ return new class extends Migration
             $table->foreign('tax_type_id')
                 ->references('id')->on('tax_types')
                 ->onDelete('cascade');
+
+            $table->timestampsTz();
         });
     }
 

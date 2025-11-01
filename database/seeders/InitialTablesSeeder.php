@@ -22,8 +22,8 @@ class InitialTablesSeeder extends Seeder
                 'is_active' => true,
                 'description' => 'Resources owned by the business that provide future economic benefit',
                 'hint' => 'Assets increase with debits and decrease with credits',
-                'created_at' => '2025-10-31 14:52:44',
-                'updated_at' => '2025-10-31 14:52:44',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
                 'id' => '019a33a0-3da5-737c-ab0e-55b8bc8f4ea0',
@@ -33,8 +33,8 @@ class InitialTablesSeeder extends Seeder
                 'is_active' => true,
                 'description' => 'Obligations the business owes, to be settled in money, goods, or services',
                 'hint' => 'Liabilities increase with credits and decrease with debits',
-                'created_at' => '2025-10-31 14:52:44',
-                'updated_at' => '2025-10-31 14:52:44',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
         ], ['id']);
 
@@ -48,8 +48,8 @@ class InitialTablesSeeder extends Seeder
                 'is_active' => true,
                 'description' => 'Assets that are expected to be converted to cash within one year',
                 'hint' => 'Include cash, receivables, inventory, and prepaid expenses',
-                'created_at' => '2025-10-31 14:52:44',
-                'updated_at' => '2025-10-31 14:52:44',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
         ], ['id']);
 
@@ -65,8 +65,8 @@ class InitialTablesSeeder extends Seeder
                 'is_system_defined' => true,
                 'description' => 'Other assets expected to be converted to cash within one year',
                 'hint' => 'Include deposits, advances, and other current assets',
-                'created_at' => '2025-10-31 14:55:13',
-                'updated_at' => '2025-10-31 14:55:13',
+                'created_at' => now(),
+                'updated_at' => now(),
                 'code' => '1',
             ],
         ], ['id']);
@@ -83,8 +83,8 @@ class InitialTablesSeeder extends Seeder
                 'is_system_defined' => true,
                 'description' => 'Other assets expected to be converted to cash within one year',
                 'hint' => 'Include deposits, advances, and other current assets',
-                'created_at' => '2025-10-31 15:03:26',
-                'updated_at' => '2025-10-31 15:03:26',
+                'created_at' => now(),
+                'updated_at' => now(),
                 'code' => '1',
             ],
         ], ['id']);
@@ -97,8 +97,8 @@ class InitialTablesSeeder extends Seeder
                 'description' => 'Independent professional or self-employed worker offering services to clients on a per-project or contract basis.',
                 'hint' => 'Select this if you personally offer your skills or services directly to clients rather than running a registered company.',
                 'is_active' => true,
-                'created_at' => '2025-10-31 14:50:23',
-                'updated_at' => '2025-10-31 14:50:23',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
         ], ['id']);
 
@@ -114,8 +114,8 @@ class InitialTablesSeeder extends Seeder
                 'description' => 'January 1 to December 31',
                 'is_default' => true,
                 'is_active' => true,
-                'created_at' => '2025-10-31 14:52:01',
-                'updated_at' => '2025-10-31 14:52:01',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
         ], ['id']);
 
@@ -127,8 +127,8 @@ class InitialTablesSeeder extends Seeder
                 'description' => 'An industry focused on providing professional skills, labor, or expertise to clients rather than producing physical goods.',
                 'hint' => 'Select this if your business primarily offers non-tangible products such as consulting, repairs, design, education, or technical support.',
                 'is_active' => true,
-                'created_at' => '2025-10-31 14:51:11',
-                'updated_at' => '2025-10-31 14:51:27',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
         ], ['id']);
 
@@ -140,8 +140,8 @@ class InitialTablesSeeder extends Seeder
                 'description' => null,
                 'hint' => null,
                 'is_active' => true,
-                'created_at' => '2025-10-31 14:47:16',
-                'updated_at' => '2025-10-31 14:47:16',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
                 'id' => '019a3905-c1cf-73d4-939e-731ae276063c',
@@ -149,8 +149,8 @@ class InitialTablesSeeder extends Seeder
                 'description' => null,
                 'hint' => null,
                 'is_active' => true,
-                'created_at' => '2025-10-31 14:47:49',
-                'updated_at' => '2025-10-31 14:47:49',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
             [
                 'id' => '019a3906-2b15-71e5-8af0-6a4b9fe70a61',
@@ -158,8 +158,8 @@ class InitialTablesSeeder extends Seeder
                 'description' => null,
                 'hint' => null,
                 'is_active' => true,
-                'created_at' => '2025-10-31 14:48:16',
-                'updated_at' => '2025-10-31 14:48:35',
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
         ], ['id']);
 
@@ -171,9 +171,24 @@ class InitialTablesSeeder extends Seeder
                 'description' => null,
                 'hint' => null,
                 'is_active' => true,
-                'created_at' => '2025-10-31 14:49:14',
-                'updated_at' => '2025-10-31 14:49:14',
+                'created_at' => now(),
+                'updated_at' => now(),
                 'category_id' => '019a3905-40fd-735d-8601-a72fcbc8aaf6',
+            ],
+        ], ['id']);
+
+        // Data for Name: government_agencies;
+        DB::table('government_agencies')->upsert([
+            [
+                'id' => '019a3908-19c5-70c7-a928-a478283d7aa3',
+                'code' => 'BIR',
+                'name' => 'Bureau of Internal Revenue',
+                'full_name' => 'Bureau of Internal Revenue',
+                'description' => 'Business registration and regulation',
+                'website_url' => 'https://www.bir.gov.ph',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
             ],
         ], ['id']);
     }
