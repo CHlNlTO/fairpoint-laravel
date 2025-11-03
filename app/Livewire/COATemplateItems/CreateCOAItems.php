@@ -6,10 +6,13 @@ use App\Models\AccountClass;
 use App\Models\AccountSubclass;
 use App\Models\AccountSubtype;
 use App\Models\AccountType;
+use App\Models\BusinessType;
 use App\Models\COAItemBusinessType;
 use App\Models\COAItemIndustryType;
 use App\Models\COAItemTaxType;
 use App\Models\COATemplateItem;
+use App\Models\IndustryType;
+use App\Models\TaxType;
 use Livewire\Component;
 
 class CreateCOAItems extends Component
@@ -21,6 +24,9 @@ class CreateCOAItems extends Component
     public $accountSubclasses = [];
     public $accountTypes = [];
     public $accountSubtypes = [];
+    public $businessTypes = [];
+    public $industryTypes = [];
+    public $taxTypes = [];
 
     public function mount()
     {
@@ -38,6 +44,9 @@ class CreateCOAItems extends Component
             'normal_balance' => 'debit',
             'is_active' => true,
             'is_default' => true,
+            'business_type_ids' => [],
+            'industry_type_ids' => [],
+            'tax_type_ids' => [],
         ]];
     }
 
@@ -98,27 +107,39 @@ class CreateCOAItems extends Component
                 ];
             })
             ->toArray();
-    }
 
-    public function addItem()
-    {
-        $this->items[] = [
-            'account_code' => '',
-            'account_name' => '',
-            'account_class_id' => '',
-            'account_subclass_id' => '',
-            'account_type_id' => '',
-            'account_subtype_id' => '',
-            'normal_balance' => 'debit',
-            'is_active' => true,
-            'is_default' => true,
-        ];
-    }
+        $this->businessTypes = BusinessType::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($type) {
+                return [
+                    'id' => $type->id,
+                    'name' => $type->name,
+                ];
+            })
+            ->toArray();
 
-    public function removeItem($index)
-    {
-        unset($this->items[$index]);
-        $this->items = array_values($this->items); // Re-index array
+        $this->industryTypes = IndustryType::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($type) {
+                return [
+                    'id' => $type->id,
+                    'name' => $type->name,
+                ];
+            })
+            ->toArray();
+
+        $this->taxTypes = TaxType::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($type) {
+                return [
+                    'id' => $type->id,
+                    'name' => $type->name,
+                ];
+            })
+            ->toArray();
     }
 
     public function generateAccountCode($index)
@@ -191,11 +212,38 @@ class CreateCOAItems extends Component
                 'account_subtype_id' => $item['account_subtype_id'],
                 'normal_balance' => $item['normal_balance'],
                 'is_active' => $item['is_active'] ?? true,
-                'is_default' => $item['is_default'] ?? false,
+                'is_default' => $item['is_default'] ?? true,
             ]);
 
-            // Create pivot table entries if needed (business_types, industry_types, tax_types)
-            // Add these if you have the relationships
+            // Create pivot table entries for business types
+            if (!empty($item['business_type_ids'])) {
+                foreach ($item['business_type_ids'] as $businessTypeId) {
+                    COAItemBusinessType::create([
+                        'account_item_id' => $coaItem->id,
+                        'business_type_id' => $businessTypeId,
+                    ]);
+                }
+            }
+
+            // Create pivot table entries for industry types
+            if (!empty($item['industry_type_ids'])) {
+                foreach ($item['industry_type_ids'] as $industryTypeId) {
+                    COAItemIndustryType::create([
+                        'account_item_id' => $coaItem->id,
+                        'industry_type_id' => $industryTypeId,
+                    ]);
+                }
+            }
+
+            // Create pivot table entries for tax types
+            if (!empty($item['tax_type_ids'])) {
+                foreach ($item['tax_type_ids'] as $taxTypeId) {
+                    COAItemTaxType::create([
+                        'account_item_id' => $coaItem->id,
+                        'tax_type_id' => $taxTypeId,
+                    ]);
+                }
+            }
         }
 
         session()->flash('success', 'Chart of Account items created successfully.');

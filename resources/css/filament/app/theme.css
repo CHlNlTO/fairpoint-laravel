@@ -8,3 +8,21 @@
     @apply relative flex w-full flex-1 flex-col bg-white dark:bg-black m-2 md:ml-0 md:rounded-xl md:shadow-sm
 
 }
+
+@utility scrollbar-thin {
+    &::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+    &::-webkit-scrollbar-thumb {
+        background-color: rgb(156 163 175);
+        border-radius: 9999px;
+    }
+    &::-webkit-scrollbar-track {
+        background-color: transparent;
+    }
+}
+
+.fi-sidebar-nav {
+    @apply scrollbar-thin;
+}
