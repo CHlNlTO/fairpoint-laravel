@@ -9,7 +9,7 @@ class CustomCreateCOATemplateItem extends Page
 {
     protected static string $resource = COATemplateItemResource::class;
 
-    protected string $view = 'filament.resources.coa-template-items.pages.custom-create';
+    protected string $view = 'filament.resources.coa-template-items.pages.create';
 
     public function getTitle(): string
     {
