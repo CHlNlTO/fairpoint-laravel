@@ -3,7 +3,23 @@
     accountClasses: @js($accountClasses),
     accountSubclasses: @js($accountSubclasses),
     accountTypes: @js($accountTypes),
-    accountSubtypes: @js($accountSubtypes)
+    accountSubtypes: @js($accountSubtypes),
+    addItem() {
+        this.items.push({
+            account_code: '',
+            account_name: '',
+            account_class_id: '',
+            account_subclass_id: '',
+            account_type_id: '',
+            account_subtype_id: '',
+            normal_balance: 'debit',
+            is_active: true,
+            is_default: true
+        });
+    },
+    removeItem(index) {
+        this.items.splice(index, 1);
+    }
 }">
     <div class="fi-ac fi-align-end">
         <button wire:click="save" type="button"
@@ -357,7 +373,7 @@
                         <td>
                             <div class="fi-fo-table-repeater-actions">
                                 <button type="button"
-                                        @click="$wire.removeItem(index)"
+                                        @click="removeItem(index)"
                                         class="fi-color-danger fi-icon-btn fi-size-sm fi-ac-icon-btn-action"
                                         title="Delete">
                                     <svg class="fi-icon fi-size-md" xmlns="http://www.w.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -374,7 +390,7 @@
         <!-- Add Item Button -->
         <div class="fi-fo-table-repeater-add">
             <button type="button"
-                    @click="$wire.addItem()"
+                    @click="addItem()"
                     class="fi-btn fi-size-sm fi-ac-btn-action">
                 + Add Another Item
             </button>

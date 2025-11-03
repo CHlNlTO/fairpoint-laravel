@@ -37,7 +37,7 @@ class CreateCOAItems extends Component
             'account_subtype_id' => '',
             'normal_balance' => 'debit',
             'is_active' => true,
-            'is_default' => false,
+            'is_default' => true,
         ]];
     }
 
@@ -111,7 +111,7 @@ class CreateCOAItems extends Component
             'account_subtype_id' => '',
             'normal_balance' => 'debit',
             'is_active' => true,
-            'is_default' => false,
+            'is_default' => true,
         ];
     }
 
@@ -200,11 +200,11 @@ class CreateCOAItems extends Component
 
         session()->flash('success', 'Chart of Account items created successfully.');
 
-        return redirect()->route('filament.admin.resources.chart-of-account-items.index');
+        return redirect()->route('filament.app.resources.chart-of-account-items.index');
     }
 
     public function render()
     {
-        return view('livewire.c-o-a-template-items.create-c-o-a-items');
+        return view('livewire.coa-template-items.create-coa-items');
     }
 }
