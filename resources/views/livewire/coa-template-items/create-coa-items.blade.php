@@ -4,6 +4,9 @@
     accountSubclasses: @js($accountSubclasses),
     accountTypes: @js($accountTypes),
     accountSubtypes: @js($accountSubtypes),
+    businessTypes: @js($businessTypes),
+    industryTypes: @js($industryTypes),
+    taxTypes: @js($taxTypes),
     addItem() {
         this.items.push({
             account_code: '',
@@ -14,11 +17,65 @@
             account_subtype_id: '',
             normal_balance: 'debit',
             is_active: true,
-            is_default: true
+            is_default: true,
+            business_type_ids: [],
+            industry_type_ids: [],
+            tax_type_ids: []
         });
     },
     removeItem(index) {
         this.items.splice(index, 1);
+    },
+    toggleType(item, type, value) {
+        // Get the appropriate array and the other two arrays
+        let targetArray, otherArrays;
+        if (type === 'business') {
+            targetArray = item.business_type_ids;
+            otherArrays = [item.industry_type_ids, item.tax_type_ids];
+        } else if (type === 'industry') {
+            targetArray = item.industry_type_ids;
+            otherArrays = [item.business_type_ids, item.tax_type_ids];
+        } else if (type === 'tax') {
+            targetArray = item.tax_type_ids;
+            otherArrays = [item.business_type_ids, item.industry_type_ids];
+        }
+
+        // Toggle the value
+        const index = targetArray.indexOf(value);
+        if (index > -1) {
+            targetArray.splice(index, 1);
+        } else {
+            targetArray.push(value);
+        }
+
+        // Disable/enable other columns based on selections
+        const hasSelections = targetArray.length > 0;
+        otherArrays.forEach(arr => {
+            if (hasSelections) {
+                // Clear other arrays if this one has selections
+                arr.splice(0, arr.length);
+            }
+        });
+    },
+    isDisabled(item, type) {
+        if (type === 'business') {
+            return item.industry_type_ids.length > 0 || item.tax_type_ids.length > 0;
+        } else if (type === 'industry') {
+            return item.business_type_ids.length > 0 || item.tax_type_ids.length > 0;
+        } else if (type === 'tax') {
+            return item.business_type_ids.length > 0 || item.industry_type_ids.length > 0;
+        }
+        return false;
+    },
+    isChecked(item, type, value) {
+        if (type === 'business') {
+            return item.business_type_ids.includes(value);
+        } else if (type === 'industry') {
+            return item.industry_type_ids.includes(value);
+        } else if (type === 'tax') {
+            return item.tax_type_ids.includes(value);
+        }
+        return false;
     }
 }">
     <div class="fi-ac fi-align-end">
@@ -44,7 +101,8 @@
         </div>
     @endif
 
-    <div class="fi-fo-table-repeater fi-compact">
+    <div class="fi-fo-table-repeater fi-compact overflow-x-auto gap-64 scrollbar-thin pb-10">
+        {{-- <div class="overflow-x-auto"> --}}
         <table>
             <thead>
                 <tr>
@@ -55,6 +113,9 @@
                     <th>Account Type<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
                     <th>Account Subtype<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
                     <th>Normal Balance<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
+                    <th>Business Type</th>
+                    <th>Industry Type</th>
+                    <th>Tax Type</th>
                     <th>Active</th>
                     <th>Default</th>
                     <th class="fi-fo-table-repeater-empty-header-cell"></th>
@@ -64,7 +125,7 @@
                 <template x-for="(item, index) in items" :key="index">
                     <tr>
                         <!-- Account Code -->
-                        <td>
+                        <td class="min-w-[100px]">
                             <div class="fi-input-wrp fi-disabled fi-fo-text-input">
                                 <div class="fi-input-wrp-content-ctn">
                                     <input type="text"
@@ -78,7 +139,7 @@
                         </td>
 
                         <!-- Account Name -->
-                        <td>
+                        <td class="min-w-64">
                              <div class="fi-input-wrp fi-fo-text-input">
                                 <div class="fi-input-wrp-content-ctn">
                                     <input type="text"
@@ -90,7 +151,7 @@
                         </td>
 
                         <!-- Account Class -->
-                        <td x-data="{
+                        <td class="min-w-48" x-data="{
                             open: false,
                             selectedLabel: '',
                             init() {
@@ -107,7 +168,7 @@
                         <div class="fi-input-wrp fi-fo-select">
                             <div class="fi-input-wrp-content-ctn">
                                 <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn" @click.outside="open = false">
+                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
                                         <!-- This is the visible button that looks like an input -->
                                         <button type="button"
                                                 @click="open = !open"
@@ -125,7 +186,7 @@
                                         <!-- This is the custom dropdown panel -->
                                         <div x-show="open"
                                             x-transition
-                                            class="fi-dropdown-panel fi-scrollable absolute z-10 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20"
+                                            class="fi-dropdown-panel fi-scrollable absolute z-50 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20"
                                             style="display: none;">
                                             <ul class="fi-dropdown-list p-1">
                                                 <template x-for="aclass in accountClasses" :key="aclass.id">
@@ -144,7 +205,7 @@
                         </td>
 
                         <!-- Account Subclass -->
-                        <td x-data="{
+                        <td class="min-w-48" x-data="{
                             open: false,
                             selectedLabel: '',
                             init() {
@@ -165,7 +226,7 @@
                         <div class="fi-input-wrp fi-fo-select" :class="{ 'fi-disabled': !item.account_class_id }">
                             <div class="fi-input-wrp-content-ctn">
                                 <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn" @click.outside="open = false">
+                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
                                         <button type="button"
                                                 @click="item.account_class_id && (open = !open)"
                                                 :disabled="!item.account_class_id"
@@ -193,7 +254,7 @@
                         </td>
 
                         <!-- Account Type -->
-                        <td x-data="{
+                        <td class="min-w-48" x-data="{
                             open: false,
                             selectedLabel: '',
                             init() {
@@ -213,7 +274,7 @@
                         <div class="fi-input-wrp fi-fo-select" :class="{ 'fi-disabled': !item.account_subclass_id }">
                             <div class="fi-input-wrp-content-ctn">
                                 <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn" @click.outside="open = false">
+                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
                                         <button type="button"
                                                 @click="item.account_subclass_id && (open = !open)"
                                                 :disabled="!item.account_subclass_id"
@@ -241,7 +302,7 @@
                         </td>
 
                         <!-- Account Subtype -->
-                        <td x-data="{
+                        <td class="min-w-48" x-data="{
                             open: false,
                             selectedLabel: '',
                             init() {
@@ -258,7 +319,7 @@
                         <div class="fi-input-wrp fi-fo-select" :class="{ 'fi-disabled': !item.account_type_id }">
                             <div class="fi-input-wrp-content-ctn">
                                 <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn" @click.outside="open = false">
+                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
                                         <button type="button"
                                                 @click="item.account_type_id && (open = !open)"
                                                 :disabled="!item.account_type_id"
@@ -286,7 +347,7 @@
                         </td>
 
                         <!-- Normal Balance -->
-                        <td x-data="{
+                        <td class="min-w-40" x-data="{
                             open: false,
                             options: [
                                 { value: 'debit', label: 'Debit' },
@@ -307,7 +368,7 @@
                         <div class="fi-input-wrp fi-fo-select">
                             <div class="fi-input-wrp-content-ctn">
                                 <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn" @click.outside="open = false">
+                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
                                         <button type="button"
                                                 @click="open = !open"
                                                 class="fi-select-input-btn w-full text-left">
@@ -333,11 +394,74 @@
                         </div>
                         </td>
 
+                        <!-- Business Type -->
+                        <td class="min-w-56">
+                            <div class="fi-input-wrp" :class="{ 'fi-disabled': isDisabled(item, 'business') }">
+                                <div class="space-y-1 max-h-32 overflow-y-auto p-1">
+                                    <template x-for="bt in businessTypes" :key="bt.id">
+                                        <label class="flex items-center gap-x-2 cursor-pointer"
+                                               :class="{ 'opacity-50 cursor-not-allowed': isDisabled(item, 'business') }">
+                                            <input type="checkbox"
+                                                   :checked="isChecked(item, 'business', bt.id)"
+                                                   :disabled="isDisabled(item, 'business')"
+                                                   @click="toggleType(item, 'business', bt.id)"
+                                                   class="fi-checkbox-input rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50">
+                                            <span class="text-sm" x-text="bt.name"></span>
+                                        </label>
+                                    </template>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Industry Type -->
+                        <td class="min-w-56">
+                            <div class="fi-input-wrp" :class="{ 'fi-disabled': isDisabled(item, 'industry') }">
+                                <div class="space-y-1 max-h-32 overflow-y-auto p-1">
+                                    <template x-for="it in industryTypes" :key="it.id">
+                                        <label class="flex items-center gap-x-2 cursor-pointer"
+                                               :class="{ 'opacity-50 cursor-not-allowed': isDisabled(item, 'industry') }">
+                                            <input type="checkbox"
+                                                   :checked="isChecked(item, 'industry', it.id)"
+                                                   :disabled="isDisabled(item, 'industry')"
+                                                   @click="toggleType(item, 'industry', it.id)"
+                                                   class="fi-checkbox-input rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50">
+                                            <span class="text-sm" x-text="it.name"></span>
+                                        </label>
+                                    </template>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Tax Type -->
+                        <td class="min-w-56">
+                            <div class="fi-input-wrp" :class="{ 'fi-disabled': isDisabled(item, 'tax') }">
+                                <div class="space-y-1 max-h-32 overflow-y-auto p-1">
+                                    <template x-for="tt in taxTypes" :key="tt.id">
+                                        <label class="flex items-center gap-x-2 cursor-pointer"
+                                               :class="{ 'opacity-50 cursor-not-allowed': isDisabled(item, 'tax') }">
+                                            <input type="checkbox"
+                                                   :checked="isChecked(item, 'tax', tt.id)"
+                                                   :disabled="isDisabled(item, 'tax')"
+                                                   @click="toggleType(item, 'tax', tt.id)"
+                                                   class="fi-checkbox-input rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50">
+                                            <span class="text-sm" x-text="tt.name"></span>
+                                        </label>
+                                    </template>
+                                </div>
+                            </div>
+                        </td>
+
                         <!-- Is Active -->
-                        <td>
+                        <td class="min-w-[80px]">
                             <div class="col-span-1 flex items-center justify-center fi-fo-field-content-col">
-                                <button x-data="{ state: $wire.$entangle('item.is_active', false) }" x-bind:aria-checked="state?.toString()" x-on:click="state = ! state" x-bind:class="
-                                        state ? 'fi-toggle-on fi-color fi-color-primary fi-bg-color-600 fi-text-color-600 dark:fi-bg-color-500' : 'fi-toggle-off'    " class="fi-toggle fi-fo-toggle" role="switch" type="button" ariachecked="false" id="form.is_default" wire:loading.attr="disabled" wire:target="data.is_default" aria-checked="true">
+                                <button x-bind:aria-checked="item.is_active.toString()"
+                                        x-on:click="item.is_active = !item.is_active"
+                                        x-bind:class="
+                                            item.is_active ? 'fi-toggle-on fi-color fi-color-primary fi-bg-color-600 fi-text-color-600 dark:fi-bg-color-500' : 'fi-toggle-off'
+                                        "
+                                        class="fi-toggle fi-fo-toggle"
+                                        role="switch"
+                                        type="button">
                                     <div>
                                         <div aria-hidden="true">
 
@@ -352,16 +476,22 @@
                         </td>
 
                         <!-- Is Default -->
-                        <td>
+                        <td class="min-w-[80px]">
                             <div class="col-span-1 flex items-center justify-center fi-fo-field-content-col">
-                                <button x-data="{ state: $wire.$entangle('item.is_default', false) }" x-bind:aria-checked="state?.toString()" x-on:click="state = ! state" x-bind:class="
-                                        state ? 'fi-toggle-on fi-color fi-color-primary fi-bg-color-600 fi-text-color-600 dark:fi-bg-color-500' : 'fi-toggle-off'    " class="fi-toggle fi-fo-toggle" role="switch" type="button" ariachecked="false" id="form.is_default" wire:loading.attr="disabled" wire:target="data.is_default" aria-checked="true">
+                                <button x-bind:aria-checked="item.is_default.toString()"
+                                        x-on:click="item.is_default = !item.is_default"
+                                        x-bind:class="
+                                            item.is_default ? 'fi-toggle-on fi-color fi-color-primary fi-bg-color-600 fi-text-color-600 dark:fi-bg-color-500' : 'fi-toggle-off'
+                                        "
+                                        class="fi-toggle fi-fo-toggle"
+                                        role="switch"
+                                        type="button">
                                     <div>
                                         <div aria-hidden="true">
 
                                         </div>
 
-                                        <div aria-hidden="true">
+                                        <div aria-hidden="true"></div>
 
                                         </div>
                                     </div>
@@ -386,6 +516,7 @@
                 </template>
             </tbody>
         </table>
+        {{-- </div> --}}
 
         <!-- Add Item Button -->
         <div class="fi-fo-table-repeater-add">
