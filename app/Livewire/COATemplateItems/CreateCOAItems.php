@@ -23,6 +23,8 @@ class CreateCOAItems extends Component
 
     public $items = [];
     public $csvFile;
+    public string $mode = 'create';
+    public array $ignoreCoaItemIds = [];
 
     // Hierarchy data loaded once
     public $accountClasses = [];
@@ -169,7 +171,13 @@ class CreateCOAItems extends Component
         // Collect used suffixes from database
         $usedSuffixes = [];
 
-        $existingCodes = COATemplateItem::where('account_subtype_id', $subtypeId)
+        $existingCodesQuery = COATemplateItem::where('account_subtype_id', $subtypeId);
+
+        if (!empty($this->ignoreCoaItemIds)) {
+            $existingCodesQuery->whereNotIn('id', $this->ignoreCoaItemIds);
+        }
+
+        $existingCodes = $existingCodesQuery
             ->pluck('account_code')
             ->toArray();
 
@@ -749,7 +757,13 @@ class CreateCOAItems extends Component
     protected function ensureUniqueAccountCodes(): void
     {
         // Collect all used codes from database (across ALL subtypes to avoid conflicts)
-        $allExistingCodes = COATemplateItem::pluck('account_code')->toArray();
+        $existingCodesQuery = COATemplateItem::query();
+
+        if (!empty($this->ignoreCoaItemIds)) {
+            $existingCodesQuery->whereNotIn('id', $this->ignoreCoaItemIds);
+        }
+
+        $allExistingCodes = $existingCodesQuery->pluck('account_code')->toArray();
         // Flip array to use codes as keys for O(1) lookup
         $usedCodes = array_flip($allExistingCodes);
 
@@ -952,7 +966,13 @@ class CreateCOAItems extends Component
                 function ($attribute, $value, $fail) {
                     // Check if account code already exists in database
                     // (This is a final safety check; ensureUniqueAccountCodes should prevent this)
-                    $exists = COATemplateItem::where('account_code', $value)->exists();
+                    $existsQuery = COATemplateItem::where('account_code', $value);
+
+                    if (!empty($this->ignoreCoaItemIds)) {
+                        $existsQuery->whereNotIn('id', $this->ignoreCoaItemIds);
+                    }
+
+                    $exists = $existsQuery->exists();
                     if ($exists) {
                         $fail("The account code {$value} already exists in the database.");
                     }

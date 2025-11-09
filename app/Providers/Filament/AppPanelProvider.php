@@ -38,6 +38,13 @@ class AppPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
             ])
+            ->navigationGroups([
+                'Manage Business',
+                'Manage Accounts',
+                'Manage Agencies',
+                'Manage Types',
+                'Manage Permissions',
+            ])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

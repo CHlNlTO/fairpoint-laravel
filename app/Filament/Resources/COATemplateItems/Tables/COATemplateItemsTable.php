@@ -29,6 +29,21 @@ class COATemplateItemsTable
                     ->label('Name')
                     ->sortable()
                     ->searchable(),
+                TextColumn::make('accountSubtype.accountType.accountSubclass.accountClass.name')
+                    ->label('Class')
+                    ->sortable()
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('accountSubtype.accountType.accountSubclass.name')
+                    ->label('Subclass')
+                    ->sortable()
+                    ->searchable()
+                    ->toggleable(),
+                TextColumn::make('accountSubtype.accountType.name')
+                    ->label('Type')
+                    ->sortable()
+                    ->searchable()
+                    ->toggleable(),
                 TextColumn::make('accountSubtype.name')
                     ->label('Subtype')
                     ->sortable()
@@ -43,10 +58,6 @@ class COATemplateItemsTable
                     ->formatStateUsing(fn (string $state): string => ucfirst($state))
                     ->badge()
                     ->sortable(),
-                TextColumn::make('sort_order')
-                    ->label('Sort Order')
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
@@ -71,6 +82,21 @@ class COATemplateItemsTable
                         'debit' => 'Debit',
                         'credit' => 'Credit',
                     ]),
+                SelectFilter::make('accountSubtype.accountType.accountSubclass.accountClass.name')
+                    ->label('Class')
+                    ->relationship('accountSubtype.accountType.accountSubclass.accountClass', 'name')
+                    ->preload()
+                    ->searchable(),
+                SelectFilter::make('accountSubtype.accountType.accountSubclass.name')
+                    ->label('Subclass')
+                    ->relationship('accountSubtype.accountType.accountSubclass', 'name')
+                    ->preload()
+                    ->searchable(),
+                SelectFilter::make('accountSubtype.accountType.name')
+                    ->label('Type')
+                    ->relationship('accountSubtype.accountType', 'name')
+                    ->preload()
+                    ->searchable(),
                 SelectFilter::make('account_subtype_id')
                     ->label('Account Subtype')
                     ->relationship('accountSubtype', 'name')
@@ -86,6 +112,7 @@ class COATemplateItemsTable
                 BulkActionGroup::make([
                     DeleteBulkAction::make(),
                 ]),
-            ]);
+            ])
+            ->defaultSort('account_code', 'asc');
     }
 }

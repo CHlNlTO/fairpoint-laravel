@@ -2,17 +2,14 @@
 
 namespace App\Filament\Resources\COATemplateItems;
 
-use App\Filament\Resources\COATemplateItems\Pages\CreateCOATemplateItem;
 use App\Filament\Resources\COATemplateItems\Pages\CustomCreateCOATemplateItem;
 use App\Filament\Resources\COATemplateItems\Pages\EditCOATemplateItem;
 use App\Filament\Resources\COATemplateItems\Pages\ListCOATemplateItems;
 use App\Filament\Resources\COATemplateItems\Pages\ViewCOATemplateItem;
-use App\Filament\Resources\COATemplateItems\Schemas\COATemplateItemForm;
 use App\Filament\Resources\COATemplateItems\Tables\COATemplateItemsTable;
 use App\Models\COATemplateItem;
 use BackedEnum;
 use Filament\Resources\Resource;
-use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use UnitEnum;
@@ -31,11 +28,6 @@ class COATemplateItemResource extends Resource
     protected static ?string $pluralModelLabel = 'Chart of Account Items';
     protected static ?string $modelLabel = 'Chart of Account Item';
     protected static ?string $slug = 'chart-of-account-items';
-
-    public static function form(Schema $schema): Schema
-    {
-        return COATemplateItemForm::configure($schema);
-    }
 
     public static function table(Table $table): Table
     {

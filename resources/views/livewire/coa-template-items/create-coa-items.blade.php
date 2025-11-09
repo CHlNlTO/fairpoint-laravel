@@ -158,47 +158,49 @@
         return false;
     }
 }">
-    <!-- CSV Import Section -->
-    <div class="mb-6 p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-        <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Import from CSV</h3>
-        </div>
-        <div class="flex items-center gap-4">
-            <div class="flex-1">
-                <div class="fi-input-wrp fi-fo-file-upload">
-                    <div class="fi-input-wrp-content-ctn">
-                        <input type="file"
-                               wire:model="csvFile"
-                               accept=".csv"
-                               class="fi-input file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-primary-900/20 dark:file:text-primary-400">
-                    </div>
-                </div>
-                @error('csvFile')
-                    <p class="mt-1 text-sm text-danger-600 dark:text-danger-400">{{ $message }}</p>
-                @enderror
+    @if($this->mode === 'create')
+        <!-- CSV Import Section -->
+        <div class="mb-6 p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Import from CSV</h3>
             </div>
-            <button wire:click="downloadTemplate"
-                    wire:loading.attr="disabled"
-                    wire:target="processCsv,save"
-                    type="button"
-                    class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600">
-                Download Template
-            </button>
-            <button wire:click="processCsv"
-                    wire:target="processCsv,save"
-                    wire:loading.attr="disabled"
-                    @disabled(!$csvFile)
-                    type="button"
-                    class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60 disabled:cursor-not-allowed">
-                <svg wire:loading wire:target="processCsv" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                </svg>
-                <span wire:loading.remove wire:target="processCsv">Process CSV</span>
-                <span wire:loading wire:target="processCsv">Processing...</span>
-            </button>
+            <div class="flex items-center gap-4">
+                <div class="flex-1">
+                    <div class="fi-input-wrp fi-fo-file-upload">
+                        <div class="fi-input-wrp-content-ctn">
+                            <input type="file"
+                                   wire:model="csvFile"
+                                   accept=".csv"
+                                   class="fi-input file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-primary-900/20 dark:file:text-primary-400">
+                        </div>
+                    </div>
+                    @error('csvFile')
+                        <p class="mt-1 text-sm text-danger-600 dark:text-danger-400">{{ $message }}</p>
+                    @enderror
+                </div>
+                <button wire:click="downloadTemplate"
+                        wire:loading.attr="disabled"
+                        wire:target="processCsv,save"
+                        type="button"
+                        class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600">
+                    Download Template
+                </button>
+                <button wire:click="processCsv"
+                        wire:target="processCsv,save"
+                        wire:loading.attr="disabled"
+                        @disabled(!$csvFile)
+                        type="button"
+                        class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60 disabled:cursor-not-allowed">
+                    <svg wire:loading wire:target="processCsv" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                    </svg>
+                    <span wire:loading.remove wire:target="processCsv">Process CSV</span>
+                    <span wire:loading wire:target="processCsv">Processing...</span>
+                </button>
+            </div>
         </div>
-    </div>
+    @endif
 
     <div class="fi-ac fi-align-end">
         <button wire:click="save"
@@ -210,7 +212,9 @@
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>
-            <span wire:loading.remove wire:target="save">Save All Items</span>
+            <span wire:loading.remove wire:target="save">
+                {{ $this->mode === 'create' ? 'Save All Items' : 'Save Changes' }}
+            </span>
             <span wire:loading wire:target="save">Saving...</span>
         </button>
     </div>
@@ -248,7 +252,9 @@
                     <th>Tax Type</th>
                     <th>Active</th>
                     <th>Default</th>
-                    <th class="fi-fo-table-repeater-empty-header-cell"></th>
+                    @if($this->mode === 'create')
+                        <th class="fi-fo-table-repeater-empty-header-cell"></th>
+                    @endif
                 </tr>
             </thead>
             <tbody>
@@ -839,32 +845,36 @@
                             </div>
                         </td>
 
-                        <!-- Actions -->
-                        <td>
-                            <div class="fi-fo-table-repeater-actions">
-                                <button type="button"
-                                        @click="removeItem(index)"
-                                        class="fi-color-danger fi-icon-btn fi-size-sm fi-ac-icon-btn-action"
-                                        title="Delete">
-                                    <svg class="fi-icon fi-size-md" xmlns="http://www.w.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                      <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd"></path>
-                                    </svg>
-                                </button>
-                            </div>
-                        </td>
+                        @if($this->mode === 'create')
+                            <!-- Actions -->
+                            <td>
+                                <div class="fi-fo-table-repeater-actions">
+                                    <button type="button"
+                                            @click="removeItem(index)"
+                                            class="fi-color-danger fi-icon-btn fi-size-sm fi-ac-icon-btn-action"
+                                            title="Delete">
+                                        <svg class="fi-icon fi-size-md" xmlns="http://www.w.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                          <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clip-rule="evenodd"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </td>
+                        @endif
                     </tr>
                 </template>
             </tbody>
         </table>
         {{-- </div> --}}
 
-        <!-- Add Item Button -->
-        <div class="fi-fo-table-repeater-add">
-            <button type="button"
-                    @click="addItem()"
-                    class="fi-btn fi-size-sm fi-ac-btn-action">
-                + Add Another Item
-            </button>
-        </div>
+        @if($this->mode === 'create')
+            <!-- Add Item Button -->
+            <div class="fi-fo-table-repeater-add">
+                <button type="button"
+                        @click="addItem()"
+                        class="fi-btn fi-size-sm fi-ac-btn-action">
+                    + Add Another Item
+                </button>
+            </div>
+        @endif
     </div>
 </div>
