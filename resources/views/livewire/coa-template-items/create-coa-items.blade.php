@@ -90,7 +90,7 @@
             account_subtype_name: '',
             normal_balance: 'debit',
             is_active: true,
-            is_default: true,
+            is_default: false,
             business_type_ids: [],
             industry_type_ids: [],
             tax_type_ids: [],

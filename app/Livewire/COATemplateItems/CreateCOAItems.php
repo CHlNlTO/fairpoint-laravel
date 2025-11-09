@@ -13,7 +13,6 @@ use App\Models\COAItemTaxType;
 use App\Models\COATemplateItem;
 use App\Models\IndustryType;
 use App\Models\TaxType;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -38,26 +37,6 @@ class CreateCOAItems extends Component
     {
         // Load all hierarchy data once
         $this->loadHierarchyData();
-
-        // // Initialize with 1 empty item
-        // $this->items = [[
-        //     'account_code' => '',
-        //     'account_name' => '',
-        //     'account_class_id' => '',
-        //     'account_class_name' => '',
-        //     'account_subclass_id' => '',
-        //     'account_subclass_name' => '',
-        //     'account_type_id' => '',
-        //     'account_type_name' => '',
-        //     'account_subtype_id' => '',
-        //     'account_subtype_name' => '',
-        //     'normal_balance' => 'debit',
-        //     'is_active' => true,
-        //     'is_default' => true,
-        //     'business_type_ids' => [],
-        //     'industry_type_ids' => [],
-        //     'tax_type_ids' => [],
-        // ]];
     }
 
     public function loadHierarchyData()
@@ -248,7 +227,8 @@ class CreateCOAItems extends Component
             'Normal Balance',
             'Tax Type',
             'Industry Type',
-            'Business Type'
+            'Business Type',
+            'Is Default'
         ];
 
         $filename = 'coa_template_' . date('Y-m-d') . '.csv';
@@ -271,7 +251,8 @@ class CreateCOAItems extends Component
             'Debit',
             'Any',
             'Gen',
-            'Any'
+            'Any',
+            'Yes'
         ]);
 
         rewind($file);
@@ -313,7 +294,8 @@ class CreateCOAItems extends Component
             'Normal Balance',
             'Tax Type',
             'Industry Type',
-            'Business Type'
+            'Business Type',
+            'Is Default'
         ];
 
         if ($header !== $expectedHeaders) {
@@ -333,7 +315,7 @@ class CreateCOAItems extends Component
                 continue;
             }
 
-            if (count($row) !== 10) {
+            if (count($row) !== 11) {
                 continue; // Skip invalid rows
             }
 
@@ -355,7 +337,7 @@ class CreateCOAItems extends Component
                 'account_type_id' => '',
                 'account_subtype_id' => '',
                 'is_active' => true,
-                'is_default' => true,
+                'is_default' => strtolower(trim($row[10])) === 'yes',
                 'business_type_ids' => [],
                 'industry_type_ids' => [],
                 'tax_type_ids' => [],
@@ -1017,7 +999,7 @@ class CreateCOAItems extends Component
                 'account_subtype_id' => $item['account_subtype_id'],
                 'normal_balance' => $item['normal_balance'],
                 'is_active' => $item['is_active'] ?? true,
-                'is_default' => $item['is_default'] ?? true,
+                'is_default' => $item['is_default'] ?? false,
             ]);
 
             // Create pivot table entries for business types
