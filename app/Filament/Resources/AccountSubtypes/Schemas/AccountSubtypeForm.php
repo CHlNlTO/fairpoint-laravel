@@ -30,7 +30,7 @@ class AccountSubtypeForm
                             ->label('Code')
                             ->numeric()
                             ->required()
-                            ->minValue(1)
+                            ->minValue(0)
                             ->maxValue(99),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')

@@ -56,6 +56,7 @@ class AppPanelProvider extends PanelProvider
                 ->navigationGroup('Manage Permissions')
             ])
             ->topbar(false)
+            ->sidebarWidth('16rem')
             ->globalSearch(false)
             ->authMiddleware([
                 Authenticate::class,

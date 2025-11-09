@@ -7,20 +7,100 @@
     businessTypes: @js($businessTypes),
     industryTypes: @js($industryTypes),
     taxTypes: @js($taxTypes),
+    comboboxClass(item, index) {
+        return {
+            open: false,
+            searchText: '',
+            filteredOptions: this.accountClasses || [],
+            selectedLabel: '',
+            item: item,
+            accountClasses: this.accountClasses,
+            init() {
+                // Use $nextTick to ensure item data is fully loaded
+                this.$nextTick(() => {
+                    this.updateDisplay();
+                });
+
+                this.$watch('item.account_class_id', () => {
+                    this.updateDisplay();
+                });
+                this.$watch('item.account_class_name', () => {
+                    this.updateDisplay();
+                });
+                this.$watch('searchText', (newValue) => {
+                    if (newValue) {
+                        this.filteredOptions = (this.accountClasses || []).filter(ac =>
+                            ac.name.toLowerCase().includes(newValue.toLowerCase())
+                        );
+                        const exactMatch = (this.accountClasses || []).find(ac => ac.name.toLowerCase() === newValue.toLowerCase());
+                        if (!exactMatch) {
+                            this.item.account_class_name = newValue;
+                            this.item.account_class_id = '';
+                        }
+                    } else {
+                        this.filteredOptions = this.accountClasses || [];
+                        this.item.account_class_name = '';
+                        this.item.account_class_id = '';
+                    }
+                });
+            },
+            updateDisplay() {
+                const selectedClass = (this.accountClasses || []).find(ac => ac.id === this.item.account_class_id);
+                if (selectedClass) {
+                    // ID is matched, display the matched option
+                    this.selectedLabel = selectedClass.name;
+                    this.searchText = selectedClass.name;
+                } else if (this.item.account_class_name) {
+                    // No ID but has a name (new item from CSV)
+                    this.selectedLabel = this.item.account_class_name;
+                    this.searchText = this.item.account_class_name;
+                } else {
+                    // Nothing selected
+                    this.selectedLabel = '';
+                    this.searchText = '';
+                }
+            },
+            selectOption(option) {
+                this.item.account_class_id = option.id;
+                this.selectedLabel = option.name;
+                this.searchText = option.name;
+                this.item.account_class_name = option.name;
+                this.item.account_subclass_id = '';
+                this.item.account_subclass_name = '';
+                this.item.account_type_id = '';
+                this.item.account_type_name = '';
+                this.item.account_subtype_id = '';
+                this.item.account_subtype_name = '';
+                this.item.account_code = '';
+                this.open = false;
+            }
+        };
+    },
     addItem() {
         this.items.push({
             account_code: '',
             account_name: '',
             account_class_id: '',
+            account_class_name: '',
             account_subclass_id: '',
+            account_subclass_name: '',
             account_type_id: '',
+            account_type_name: '',
             account_subtype_id: '',
+            account_subtype_name: '',
             normal_balance: 'debit',
             is_active: true,
             is_default: true,
             business_type_ids: [],
             industry_type_ids: [],
-            tax_type_ids: []
+            tax_type_ids: [],
+            tax_type_name: '',
+            industry_type_name: '',
+            business_type_name: '',
+            needs_class_creation: false,
+            needs_subclass_creation: false,
+            needs_type_creation: false,
+            needs_subtype_creation: false
         });
     },
     removeItem(index) {
@@ -78,10 +158,60 @@
         return false;
     }
 }">
+    <!-- CSV Import Section -->
+    <div class="mb-6 p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Import from CSV</h3>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex-1">
+                <div class="fi-input-wrp fi-fo-file-upload">
+                    <div class="fi-input-wrp-content-ctn">
+                        <input type="file"
+                               wire:model="csvFile"
+                               accept=".csv"
+                               class="fi-input file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-primary-900/20 dark:file:text-primary-400">
+                    </div>
+                </div>
+                @error('csvFile')
+                    <p class="mt-1 text-sm text-danger-600 dark:text-danger-400">{{ $message }}</p>
+                @enderror
+            </div>
+            <button wire:click="downloadTemplate"
+                    wire:loading.attr="disabled"
+                    wire:target="processCsv,save"
+                    type="button"
+                    class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600">
+                Download Template
+            </button>
+            <button wire:click="processCsv"
+                    wire:target="processCsv,save"
+                    wire:loading.attr="disabled"
+                    @disabled(!$csvFile)
+                    type="button"
+                    class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60 disabled:cursor-not-allowed">
+                <svg wire:loading wire:target="processCsv" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+                <span wire:loading.remove wire:target="processCsv">Process CSV</span>
+                <span wire:loading wire:target="processCsv">Processing...</span>
+            </button>
+        </div>
+    </div>
+
     <div class="fi-ac fi-align-end">
-        <button wire:click="save" type="button"
-                class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600">
-            Save All Items
+        <button wire:click="save"
+                wire:target="save,processCsv"
+                wire:loading.attr="disabled"
+                type="button"
+                class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60 disabled:cursor-not-allowed">
+            <svg wire:loading wire:target="save" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+            </svg>
+            <span wire:loading.remove wire:target="save">Save All Items</span>
+            <span wire:loading wire:target="save">Saving...</span>
         </button>
     </div>
 
@@ -151,49 +281,32 @@
                         </td>
 
                         <!-- Account Class -->
-                        <td class="min-w-48" x-data="{
-                            open: false,
-                            selectedLabel: '',
-                            init() {
-                                const selectedClass = this.accountClasses.find(ac => ac.id === this.item.account_class_id);
-                                if (selectedClass) {
-                                    this.selectedLabel = selectedClass.name;
-                                }
-                                this.$watch('item.account_class_id', (newValue) => {
-                                    const selected = this.accountClasses.find(ac => ac.id === newValue);
-                                    this.selectedLabel = selected ? selected.name : '';
-                                });
-                            }
-                        }" x-init="init()">
-                        <div class="fi-input-wrp fi-fo-select">
-                            <div class="fi-input-wrp-content-ctn">
-                                <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
-                                        <!-- This is the visible button that looks like an input -->
-                                        <button type="button"
-                                                @click="open = !open"
-                                                class="fi-select-input-btn w-full text-left">
-                                            <div class="fi-select-input-value-ctn">
-                                                <!-- Show placeholder if no value is selected -->
-                                                <span x-show="!item.account_class_id" class="fi-select-input-placeholder">
-                                                    Select an option
-                                                </span>
-                                                <!-- Show selected value label if a value exists -->
-                                                <span x-show="item.account_class_id" x-text="selectedLabel"></span>
-                                            </div>
-                                        </button>
-
-                                        <!-- This is the custom dropdown panel -->
-                                        <div x-show="open"
-                                            x-transition
-                                            class="fi-dropdown-panel fi-scrollable absolute z-50 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20"
-                                            style="display: none;">
+                        <td class="min-w-48" x-data="comboboxClass(item, index)">
+                            <div class="fi-input-wrp fi-fo-text-input">
+                                <div class="fi-input-wrp-content-ctn">
+                                    <div class="relative">
+                                        <input type="text"
+                                               x-model="searchText"
+                                               @focus="open = true"
+                                               @click="open = !open"
+                                               @keydown.escape="open = false"
+                                               class="fi-input w-full"
+                                               placeholder="Type or select">
+                                        <div x-show="open && filteredOptions.length > 0"
+                                             x-transition:enter="transition ease-out duration-100"
+                                             x-transition:enter-start="transform opacity-0 scale-95"
+                                             x-transition:enter-end="transform opacity-100 scale-100"
+                                             x-transition:leave="transition ease-in duration-75"
+                                             x-transition:leave-start="transform opacity-100 scale-100"
+                                             x-transition:leave-end="transform opacity-0 scale-95"
+                                             @click.outside="open = false"
+                                             class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
                                             <ul class="fi-dropdown-list p-1">
-                                                <template x-for="aclass in accountClasses" :key="aclass.id">
-                                                    <li @click="item.account_class_id = aclass.id; open = false;"
-                                                        :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_class_id === aclass.id }"
-                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer">
-                                                        <span x-text="aclass.name"></span>
+                                                <template x-for="option in filteredOptions" :key="option.id">
+                                                    <li @click="selectOption(option)"
+                                                        :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_class_id === option.id }"
+                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                        <span x-text="option.name"></span>
                                                     </li>
                                                 </template>
                                             </ul>
@@ -201,52 +314,131 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         </td>
 
                         <!-- Account Subclass -->
                         <td class="min-w-48" x-data="{
                             open: false,
+                            searchText: '',
+                            filteredOptions: [],
                             selectedLabel: '',
+                            getAvailableOptions() {
+                                if (!this.item.account_class_id) return [];
+                                const options = this.accountSubclasses.filter(s => s.account_class_id === this.item.account_class_id);
+                                // If no options but we have a class name (new class), allow typing
+                                return options;
+                            },
                             init() {
+                                // Use $nextTick to ensure item data is fully loaded
+                                this.$nextTick(() => {
+                                    this.updateDisplay();
+                                    this.filteredOptions = this.getAvailableOptions();
+                                });
+
+                                this.$watch('item.account_class_id', () => {
+                                    this.filteredOptions = this.getAvailableOptions();
+                                    if (!this.item.account_class_id && !this.item.account_class_name) {
+                                        this.item.account_subclass_id = '';
+                                        this.item.account_subclass_name = '';
+                                        this.item.account_type_id = '';
+                                        this.item.account_type_name = '';
+                                        this.item.account_subtype_id = '';
+                                        this.item.account_subtype_name = '';
+                                        this.item.account_code = '';
+                                        this.searchText = '';
+                                    }
+                                });
+                                this.$watch('item.account_class_name', () => {
+                                    // When class name changes, update filtered options if we have an ID
+                                    if (this.item.account_class_id) {
+                                        this.filteredOptions = this.getAvailableOptions();
+                                    }
+                                });
+                                this.$watch('item.account_subclass_id', () => {
+                                    this.updateDisplay();
+                                    if (!this.item.account_subclass_id) {
+                                        this.item.account_type_id = '';
+                                        this.item.account_type_name = '';
+                                        this.item.account_subtype_id = '';
+                                        this.item.account_subtype_name = '';
+                                        this.item.account_code = '';
+                                    }
+                                });
+                                this.$watch('item.account_subclass_name', () => {
+                                    this.updateDisplay();
+                                });
+                                this.$watch('searchText', (newValue) => {
+                                    if (newValue) {
+                                        this.filteredOptions = this.getAvailableOptions().filter(s =>
+                                            s.name.toLowerCase().includes(newValue.toLowerCase())
+                                        );
+                                        const exactMatch = this.getAvailableOptions().find(s => s.name.toLowerCase() === newValue.toLowerCase());
+                                        if (!exactMatch && (this.item.account_class_id || this.item.account_class_name)) {
+                                            this.item.account_subclass_name = newValue;
+                                            this.item.account_subclass_id = '';
+                                        }
+                                    } else {
+                                        this.filteredOptions = this.getAvailableOptions();
+                                        this.item.account_subclass_name = '';
+                                        this.item.account_subclass_id = '';
+                                    }
+                                });
+                            },
+                            updateDisplay() {
                                 const selected = this.accountSubclasses.find(s => s.id === this.item.account_subclass_id);
                                 if (selected) {
                                     this.selectedLabel = selected.name;
+                                    this.searchText = selected.name;
+                                } else if (this.item.account_subclass_name) {
+                                    this.selectedLabel = this.item.account_subclass_name;
+                                    this.searchText = this.item.account_subclass_name;
+                                } else {
+                                    this.selectedLabel = '';
+                                    this.searchText = '';
                                 }
-                                this.$watch('item.account_subclass_id', (newValue) => {
-                                    const selected = this.accountSubclasses.find(s => s.id === newValue);
-                                    this.selectedLabel = selected ? selected.name : '';
-                                    if (!newValue) { // Reset dependent fields when this one is cleared
-                                        this.item.account_type_id = '';
-                                        this.item.account_subtype_id = '';
-                                    }
-                                });
+                            },
+                            selectOption(option) {
+                                this.item.account_subclass_id = option.id;
+                                this.selectedLabel = option.name;
+                                this.searchText = option.name;
+                                this.item.account_subclass_name = option.name;
+                                this.item.account_type_id = '';
+                                this.item.account_type_name = '';
+                                this.item.account_subtype_id = '';
+                                this.item.account_subtype_name = '';
+                                this.item.account_code = '';
+                                this.open = false;
                             }
                         }" x-init="init()">
-                        <div class="fi-input-wrp fi-fo-select" :class="{ 'fi-disabled': !item.account_class_id }">
+                        <div class="fi-input-wrp fi-fo-text-input" :class="{ 'fi-disabled': !item.account_class_id && !item.account_class_name }">
                             <div class="fi-input-wrp-content-ctn">
-                                <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
-                                        <button type="button"
-                                                @click="item.account_class_id && (open = !open)"
-                                                :disabled="!item.account_class_id"
-                                                class="fi-select-input-btn w-full text-left">
-                                            <div class="fi-select-input-value-ctn">
-                                                <span x-show="!item.account_subclass_id" class="fi-select-input-placeholder">Select an option</span>
-                                                <span x-show="item.account_subclass_id" x-text="selectedLabel"></span>
-                                            </div>
-                                        </button>
-                                        <div x-show="open" x-transition class="fi-dropdown-panel fi-scrollable absolute z-10 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20" style="display: none;">
-                                            <ul class="fi-dropdown-list p-1">
-                                                <template x-for="subclass in accountSubclasses.filter(s => s.account_class_id === item.account_class_id)" :key="subclass.id">
-                                                    <li @click="item.account_subclass_id = subclass.id; item.account_type_id = ''; item.account_subtype_id = ''; item.account_code = ''; open = false;"
-                                                        :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subclass_id === subclass.id }"
-                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer">
-                                                        <span x-text="subclass.name"></span>
-                                                    </li>
-                                                </template>
-                                            </ul>
-                                        </div>
+                                <div class="relative">
+                                    <input type="text"
+                                           x-model="searchText"
+                                           :disabled="!item.account_class_id && !item.account_class_name"
+                                           @focus="item.account_class_id && (open = true)"
+                                           @click="item.account_class_id && (open = !open)"
+                                           @keydown.escape="open = false"
+                                           class="fi-input w-full"
+                                           placeholder="Type or select">
+                                    <div x-show="open && filteredOptions.length > 0"
+                                         x-transition:enter="transition ease-out duration-100"
+                                         x-transition:enter-start="transform opacity-0 scale-95"
+                                         x-transition:enter-end="transform opacity-100 scale-100"
+                                         x-transition:leave="transition ease-in duration-75"
+                                         x-transition:leave-start="transform opacity-100 scale-100"
+                                         x-transition:leave-end="transform opacity-0 scale-95"
+                                         @click.outside="open = false"
+                                         class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
+                                        <ul class="fi-dropdown-list p-1">
+                                            <template x-for="option in filteredOptions" :key="option.id">
+                                                <li @click="selectOption(option)"
+                                                    :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subclass_id === option.id }"
+                                                    class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                    <span x-text="option.name"></span>
+                                                </li>
+                                            </template>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
@@ -256,45 +448,117 @@
                         <!-- Account Type -->
                         <td class="min-w-48" x-data="{
                             open: false,
+                            searchText: '',
+                            filteredOptions: [],
                             selectedLabel: '',
+                            getAvailableOptions() {
+                                if (!this.item.account_subclass_id) return [];
+                                return this.accountTypes.filter(t => t.account_subclass_id === this.item.account_subclass_id);
+                            },
                             init() {
+                                // Use $nextTick to ensure item data is fully loaded
+                                this.$nextTick(() => {
+                                    this.updateDisplay();
+                                    this.filteredOptions = this.getAvailableOptions();
+                                });
+
+                                this.$watch('item.account_subclass_id', () => {
+                                    this.filteredOptions = this.getAvailableOptions();
+                                    if (!this.item.account_subclass_id && !this.item.account_subclass_name) {
+                                        this.item.account_type_id = '';
+                                        this.item.account_type_name = '';
+                                        this.item.account_subtype_id = '';
+                                        this.item.account_subtype_name = '';
+                                        this.item.account_code = '';
+                                        this.searchText = '';
+                                    }
+                                });
+                                this.$watch('item.account_subclass_name', () => {
+                                    if (this.item.account_subclass_id) {
+                                        this.filteredOptions = this.getAvailableOptions();
+                                    }
+                                });
+                                this.$watch('item.account_type_id', () => {
+                                    this.updateDisplay();
+                                    if (!this.item.account_type_id) {
+                                        this.item.account_subtype_id = '';
+                                        this.item.account_subtype_name = '';
+                                        this.item.account_code = '';
+                                    }
+                                });
+                                this.$watch('item.account_type_name', () => {
+                                    this.updateDisplay();
+                                });
+                                this.$watch('searchText', (newValue) => {
+                                    if (newValue) {
+                                        this.filteredOptions = this.getAvailableOptions().filter(t =>
+                                            t.name.toLowerCase().includes(newValue.toLowerCase())
+                                        );
+                                        const exactMatch = this.getAvailableOptions().find(t => t.name.toLowerCase() === newValue.toLowerCase());
+                                        if (!exactMatch && (this.item.account_subclass_id || this.item.account_subclass_name)) {
+                                            this.item.account_type_name = newValue;
+                                            this.item.account_type_id = '';
+                                        }
+                                    } else {
+                                        this.filteredOptions = this.getAvailableOptions();
+                                        this.item.account_type_name = '';
+                                        this.item.account_type_id = '';
+                                    }
+                                });
+                            },
+                            updateDisplay() {
                                 const selected = this.accountTypes.find(t => t.id === this.item.account_type_id);
                                 if (selected) {
                                     this.selectedLabel = selected.name;
+                                    this.searchText = selected.name;
+                                } else if (this.item.account_type_name) {
+                                    this.selectedLabel = this.item.account_type_name;
+                                    this.searchText = this.item.account_type_name;
+                                } else {
+                                    this.selectedLabel = '';
+                                    this.searchText = '';
                                 }
-                                this.$watch('item.account_type_id', (newValue) => {
-                                    const selected = this.accountTypes.find(t => t.id === newValue);
-                                    this.selectedLabel = selected ? selected.name : '';
-                                    if (!newValue) { // Reset dependent fields when this one is cleared
-                                        this.item.account_subtype_id = '';
-                                    }
-                                });
+                            },
+                            selectOption(option) {
+                                this.item.account_type_id = option.id;
+                                this.selectedLabel = option.name;
+                                this.searchText = option.name;
+                                this.item.account_type_name = option.name;
+                                this.item.account_subtype_id = '';
+                                this.item.account_subtype_name = '';
+                                this.item.account_code = '';
+                                this.open = false;
                             }
                         }" x-init="init()">
-                        <div class="fi-input-wrp fi-fo-select" :class="{ 'fi-disabled': !item.account_subclass_id }">
+                        <div class="fi-input-wrp fi-fo-text-input" :class="{ 'fi-disabled': !item.account_subclass_id && !item.account_subclass_name }">
                             <div class="fi-input-wrp-content-ctn">
-                                <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
-                                        <button type="button"
-                                                @click="item.account_subclass_id && (open = !open)"
-                                                :disabled="!item.account_subclass_id"
-                                                class="fi-select-input-btn w-full text-left">
-                                            <div class="fi-select-input-value-ctn">
-                                                <span x-show="!item.account_type_id" class="fi-select-input-placeholder">Select an option</span>
-                                                <span x-show="item.account_type_id" x-text="selectedLabel"></span>
-                                            </div>
-                                        </button>
-                                        <div x-show="open" x-transition class="fi-dropdown-panel fi-scrollable absolute z-10 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20" style="display: none;">
-                                            <ul class="fi-dropdown-list p-1">
-                                                <template x-for="type in accountTypes.filter(t => t.account_subclass_id === item.account_subclass_id)" :key="type.id">
-                                                    <li @click="item.account_type_id = type.id; item.account_subtype_id = ''; item.account_code = ''; open = false;"
-                                                        :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_type_id === type.id }"
-                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer">
-                                                        <span x-text="type.name"></span>
-                                                    </li>
-                                                </template>
-                                            </ul>
-                                        </div>
+                                <div class="relative">
+                                    <input type="text"
+                                           x-model="searchText"
+                                           :disabled="!item.account_subclass_id && !item.account_subclass_name"
+                                           @focus="item.account_subclass_id && (open = true)"
+                                           @click="item.account_subclass_id && (open = !open)"
+                                           @keydown.escape="open = false"
+                                           class="fi-input w-full"
+                                           placeholder="Type or select">
+                                    <div x-show="open && filteredOptions.length > 0"
+                                         x-transition:enter="transition ease-out duration-100"
+                                         x-transition:enter-start="transform opacity-0 scale-95"
+                                         x-transition:enter-end="transform opacity-100 scale-100"
+                                         x-transition:leave="transition ease-in duration-75"
+                                         x-transition:leave-start="transform opacity-100 scale-100"
+                                         x-transition:leave-end="transform opacity-0 scale-95"
+                                         @click.outside="open = false"
+                                         class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
+                                        <ul class="fi-dropdown-list p-1">
+                                            <template x-for="option in filteredOptions" :key="option.id">
+                                                <li @click="selectOption(option)"
+                                                    :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_type_id === option.id }"
+                                                    class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                    <span x-text="option.name"></span>
+                                                </li>
+                                            </template>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
@@ -304,42 +568,111 @@
                         <!-- Account Subtype -->
                         <td class="min-w-48" x-data="{
                             open: false,
+                            searchText: '',
+                            filteredOptions: [],
                             selectedLabel: '',
+                            getAvailableOptions() {
+                                if (!this.item.account_type_id) return [];
+                                return this.accountSubtypes.filter(st => st.account_type_id === this.item.account_type_id);
+                            },
                             init() {
+                                // Use $nextTick to ensure item data is fully loaded
+                                this.$nextTick(() => {
+                                    this.updateDisplay();
+                                    this.filteredOptions = this.getAvailableOptions();
+                                });
+
+                                this.$watch('item.account_type_id', () => {
+                                    this.filteredOptions = this.getAvailableOptions();
+                                    if (!this.item.account_type_id && !this.item.account_type_name) {
+                                        this.item.account_subtype_id = '';
+                                        this.item.account_subtype_name = '';
+                                        this.item.account_code = '';
+                                        this.searchText = '';
+                                    }
+                                });
+                                this.$watch('item.account_type_name', () => {
+                                    if (this.item.account_type_id) {
+                                        this.filteredOptions = this.getAvailableOptions();
+                                    }
+                                });
+                                this.$watch('item.account_subtype_id', () => {
+                                    this.updateDisplay();
+                                });
+                                this.$watch('item.account_subtype_name', () => {
+                                    this.updateDisplay();
+                                });
+                                this.$watch('searchText', (newValue) => {
+                                    if (newValue) {
+                                        this.filteredOptions = this.getAvailableOptions().filter(st =>
+                                            st.name.toLowerCase().includes(newValue.toLowerCase())
+                                        );
+                                        const exactMatch = this.getAvailableOptions().find(st => st.name.toLowerCase() === newValue.toLowerCase());
+                                        if (!exactMatch && (this.item.account_type_id || this.item.account_type_name)) {
+                                            this.item.account_subtype_name = newValue;
+                                            this.item.account_subtype_id = '';
+                                            this.item.account_code = '';
+                                        }
+                                    } else {
+                                        this.filteredOptions = this.getAvailableOptions();
+                                        this.item.account_subtype_name = '';
+                                        this.item.account_subtype_id = '';
+                                        this.item.account_code = '';
+                                    }
+                                });
+                            },
+                            updateDisplay() {
                                 const selected = this.accountSubtypes.find(st => st.id === this.item.account_subtype_id);
                                 if (selected) {
                                     this.selectedLabel = selected.name;
+                                    this.searchText = selected.name;
+                                } else if (this.item.account_subtype_name) {
+                                    this.selectedLabel = this.item.account_subtype_name;
+                                    this.searchText = this.item.account_subtype_name;
+                                } else {
+                                    this.selectedLabel = '';
+                                    this.searchText = '';
                                 }
-                                this.$watch('item.account_subtype_id', (newValue) => {
-                                    const selected = this.accountSubtypes.find(st => st.id === newValue);
-                                    this.selectedLabel = selected ? selected.name : '';
-                                });
+                            },
+                            selectOption(option) {
+                                this.item.account_subtype_id = option.id;
+                                this.selectedLabel = option.name;
+                                this.searchText = option.name;
+                                this.item.account_subtype_name = option.name;
+                                this.item.account_code = '';
+                                this.open = false;
+                                $wire.generateAccountCode(index);
                             }
                         }" x-init="init()">
-                        <div class="fi-input-wrp fi-fo-select" :class="{ 'fi-disabled': !item.account_type_id }">
+                        <div class="fi-input-wrp fi-fo-text-input" :class="{ 'fi-disabled': !item.account_type_id && !item.account_type_name }">
                             <div class="fi-input-wrp-content-ctn">
-                                <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
-                                        <button type="button"
-                                                @click="item.account_type_id && (open = !open)"
-                                                :disabled="!item.account_type_id"
-                                                class="fi-select-input-btn w-full text-left">
-                                            <div class="fi-select-input-value-ctn">
-                                                <span x-show="!item.account_subtype_id" class="fi-select-input-placeholder">Select an option</span>
-                                                <span x-show="item.account_subtype_id" x-text="selectedLabel"></span>
-                                            </div>
-                                        </button>
-                                        <div x-show="open" x-transition class="fi-dropdown-panel fi-scrollable absolute z-10 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20" style="display: none;">
-                                            <ul class="fi-dropdown-list p-1">
-                                                <template x-for="subtype in accountSubtypes.filter(st => st.account_type_id === item.account_type_id)" :key="subtype.id">
-                                                    <li @click="item.account_subtype_id = subtype.id; open = false; $wire.generateAccountCode(index)"
-                                                        :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subtype_id === subtype.id }"
-                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer">
-                                                        <span x-text="subtype.name"></span>
-                                                    </li>
-                                                </template>
-                                            </ul>
-                                        </div>
+                                <div class="relative">
+                                    <input type="text"
+                                           x-model="searchText"
+                                           :disabled="!item.account_type_id && !item.account_type_name"
+                                           @focus="item.account_type_id && (open = true)"
+                                           @click="item.account_type_id && (open = !open)"
+                                           @keydown.escape="open = false"
+                                           class="fi-input w-full"
+                                           placeholder="Type or select">
+                                    <div x-show="open && filteredOptions.length > 0"
+                                         x-transition:enter="transition ease-out duration-100"
+                                         x-transition:enter-start="transform opacity-0 scale-95"
+                                         x-transition:enter-end="transform opacity-100 scale-100"
+                                         x-transition:leave="transition ease-in duration-75"
+                                         x-transition:leave-start="transform opacity-100 scale-100"
+                                         x-transition:leave-end="transform opacity-0 scale-95"
+                                         @click.outside="open = false"
+                                         class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
+                                        <ul class="fi-dropdown-list p-1">
+                                            <template x-for="option in filteredOptions" :key="option.id">
+                                                <li @click="selectOption(option)"
+                                                    :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subtype_id === option.id }"
+                                                    class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                    <span x-text="option.name"></span>
+                                                </li>
+                                            </template>
+                                        </ul>
                                     </div>
                                 </div>
                             </div>
@@ -377,7 +710,14 @@
                                                 <span x-show="item.normal_balance" x-text="selectedLabel"></span>
                                             </div>
                                         </button>
-                                        <div x-show="open" x-transition class="fi-dropdown-panel fi-scrollable absolute z-10 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20" style="display: none;">
+                                        <div x-show="open"
+                                             x-transition:enter="transition ease-out duration-100"
+                                             x-transition:enter-start="transform opacity-0 scale-95"
+                                             x-transition:enter-end="transform opacity-100 scale-100"
+                                             x-transition:leave="transition ease-in duration-75"
+                                             x-transition:leave-start="transform opacity-100 scale-100"
+                                             x-transition:leave-end="transform opacity-0 scale-95"
+                                             class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20">
                                             <ul class="fi-dropdown-list p-1">
                                                 <template x-for="option in options" :key="option.value">
                                                     <li @click="item.normal_balance = option.value; open = false;"

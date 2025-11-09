@@ -159,9 +159,21 @@ composer run setup
 composer run dev
 ```
 
+or
+
+```cmd
+set FORCE_COLOR=1 && composer run dev
+```
+
+or
+
+```powershell
+$env:FORCE_COLOR=1
+composer run dev
+```
+
 This will start:
 - Laravel development server
-- Queue worker
 - Vite dev server
 
 ### Run Tests
