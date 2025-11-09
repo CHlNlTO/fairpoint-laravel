@@ -282,12 +282,12 @@
 
                         <!-- Account Class -->
                         <td class="min-w-48" x-data="comboboxClass(item, index)">
-                            <div class="fi-input-wrp fi-fo-text-input">
-                                <div class="fi-input-wrp-content-ctn">
+                            <div class="">
+                                <div class="">
                                     <div class="relative">
                                         <input type="text"
                                                x-model="searchText"
-                                               @focus="open = true"
+                                               {{-- @focus="open = true" --}}
                                                @click="open = !open"
                                                @keydown.escape="open = false"
                                                class="fi-input w-full"
@@ -410,39 +410,39 @@
                                 this.open = false;
                             }
                         }" x-init="init()">
-                        <div class="fi-input-wrp fi-fo-text-input" :class="{ 'fi-disabled': !item.account_class_id && !item.account_class_name }">
-                            <div class="fi-input-wrp-content-ctn">
-                                <div class="relative">
-                                    <input type="text"
-                                           x-model="searchText"
-                                           :disabled="!item.account_class_id && !item.account_class_name"
-                                           @focus="item.account_class_id && (open = true)"
-                                           @click="item.account_class_id && (open = !open)"
-                                           @keydown.escape="open = false"
-                                           class="fi-input w-full"
-                                           placeholder="Type or select">
-                                    <div x-show="open && filteredOptions.length > 0"
-                                         x-transition:enter="transition ease-out duration-100"
-                                         x-transition:enter-start="transform opacity-0 scale-95"
-                                         x-transition:enter-end="transform opacity-100 scale-100"
-                                         x-transition:leave="transition ease-in duration-75"
-                                         x-transition:leave-start="transform opacity-100 scale-100"
-                                         x-transition:leave-end="transform opacity-0 scale-95"
-                                         @click.outside="open = false"
-                                         class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
-                                        <ul class="fi-dropdown-list p-1">
-                                            <template x-for="option in filteredOptions" :key="option.id">
-                                                <li @click="selectOption(option)"
-                                                    :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subclass_id === option.id }"
-                                                    class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                    <span x-text="option.name"></span>
-                                                </li>
-                                            </template>
-                                        </ul>
+                            <div :class="{ 'fi-disabled': !item.account_class_id && !item.account_class_name }">
+                                <div class="">
+                                    <div class="relative">
+                                        <input type="text"
+                                            x-model="searchText"
+                                            :disabled="!item.account_class_id && !item.account_class_name"
+                                            {{-- @focus="item.account_class_id && (open = true)" --}}
+                                            @click="item.account_class_id && (open = !open)"
+                                            @keydown.escape="open = false"
+                                            class="fi-input w-full"
+                                            placeholder="Type or select">
+                                        <div x-show="open && filteredOptions.length > 0"
+                                            x-transition:enter="transition ease-out duration-100"
+                                            x-transition:enter-start="transform opacity-0 scale-95"
+                                            x-transition:enter-end="transform opacity-100 scale-100"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="transform opacity-100 scale-100"
+                                            x-transition:leave-end="transform opacity-0 scale-95"
+                                            @click.outside="open = false"
+                                            class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
+                                            <ul class="fi-dropdown-list p-1">
+                                                <template x-for="option in filteredOptions" :key="option.id">
+                                                    <li @click="selectOption(option)"
+                                                        :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subclass_id === option.id }"
+                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                        <span x-text="option.name"></span>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         </td>
 
                         <!-- Account Type -->
@@ -530,39 +530,39 @@
                                 this.open = false;
                             }
                         }" x-init="init()">
-                        <div class="fi-input-wrp fi-fo-text-input" :class="{ 'fi-disabled': !item.account_subclass_id && !item.account_subclass_name }">
-                            <div class="fi-input-wrp-content-ctn">
-                                <div class="relative">
-                                    <input type="text"
-                                           x-model="searchText"
-                                           :disabled="!item.account_subclass_id && !item.account_subclass_name"
-                                           @focus="item.account_subclass_id && (open = true)"
-                                           @click="item.account_subclass_id && (open = !open)"
-                                           @keydown.escape="open = false"
-                                           class="fi-input w-full"
-                                           placeholder="Type or select">
-                                    <div x-show="open && filteredOptions.length > 0"
-                                         x-transition:enter="transition ease-out duration-100"
-                                         x-transition:enter-start="transform opacity-0 scale-95"
-                                         x-transition:enter-end="transform opacity-100 scale-100"
-                                         x-transition:leave="transition ease-in duration-75"
-                                         x-transition:leave-start="transform opacity-100 scale-100"
-                                         x-transition:leave-end="transform opacity-0 scale-95"
-                                         @click.outside="open = false"
-                                         class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
-                                        <ul class="fi-dropdown-list p-1">
-                                            <template x-for="option in filteredOptions" :key="option.id">
-                                                <li @click="selectOption(option)"
-                                                    :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_type_id === option.id }"
-                                                    class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                    <span x-text="option.name"></span>
-                                                </li>
-                                            </template>
-                                        </ul>
+                            <div :class="{ 'fi-disabled': !item.account_subclass_id && !item.account_subclass_name }">
+                                <div class="">
+                                    <div class="relative">
+                                        <input type="text"
+                                            x-model="searchText"
+                                            :disabled="!item.account_subclass_id && !item.account_subclass_name"
+                                            {{-- @focus="item.account_subclass_id && (open = true)" --}}
+                                            @click="item.account_subclass_id && (open = !open)"
+                                            @keydown.escape="open = false"
+                                            class="fi-input w-full"
+                                            placeholder="Type or select">
+                                        <div x-show="open && filteredOptions.length > 0"
+                                            x-transition:enter="transition ease-out duration-100"
+                                            x-transition:enter-start="transform opacity-0 scale-95"
+                                            x-transition:enter-end="transform opacity-100 scale-100"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="transform opacity-100 scale-100"
+                                            x-transition:leave-end="transform opacity-0 scale-95"
+                                            @click.outside="open = false"
+                                            class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
+                                            <ul class="fi-dropdown-list p-1">
+                                                <template x-for="option in filteredOptions" :key="option.id">
+                                                    <li @click="selectOption(option)"
+                                                        :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_type_id === option.id }"
+                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                        <span x-text="option.name"></span>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         </td>
 
                         <!-- Account Subtype -->
@@ -644,39 +644,39 @@
                                 $wire.generateAccountCode(index);
                             }
                         }" x-init="init()">
-                        <div class="fi-input-wrp fi-fo-text-input" :class="{ 'fi-disabled': !item.account_type_id && !item.account_type_name }">
-                            <div class="fi-input-wrp-content-ctn">
-                                <div class="relative">
-                                    <input type="text"
-                                           x-model="searchText"
-                                           :disabled="!item.account_type_id && !item.account_type_name"
-                                           @focus="item.account_type_id && (open = true)"
-                                           @click="item.account_type_id && (open = !open)"
-                                           @keydown.escape="open = false"
-                                           class="fi-input w-full"
-                                           placeholder="Type or select">
-                                    <div x-show="open && filteredOptions.length > 0"
-                                         x-transition:enter="transition ease-out duration-100"
-                                         x-transition:enter-start="transform opacity-0 scale-95"
-                                         x-transition:enter-end="transform opacity-100 scale-100"
-                                         x-transition:leave="transition ease-in duration-75"
-                                         x-transition:leave-start="transform opacity-100 scale-100"
-                                         x-transition:leave-end="transform opacity-0 scale-95"
-                                         @click.outside="open = false"
-                                         class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
-                                        <ul class="fi-dropdown-list p-1">
-                                            <template x-for="option in filteredOptions" :key="option.id">
-                                                <li @click="selectOption(option)"
-                                                    :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subtype_id === option.id }"
-                                                    class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
-                                                    <span x-text="option.name"></span>
-                                                </li>
-                                            </template>
-                                        </ul>
+                            <div :class="{ 'fi-disabled': !item.account_type_id && !item.account_type_name }">
+                                <div class="">
+                                    <div class="relative">
+                                        <input type="text"
+                                            x-model="searchText"
+                                            :disabled="!item.account_type_id && !item.account_type_name"
+                                            {{-- @focus="item.account_type_id && (open = true)" --}}
+                                            @click="item.account_type_id && (open = !open)"
+                                            @keydown.escape="open = false"
+                                            class="fi-input w-full"
+                                            placeholder="Type or select">
+                                        <div x-show="open && filteredOptions.length > 0"
+                                            x-transition:enter="transition ease-out duration-100"
+                                            x-transition:enter-start="transform opacity-0 scale-95"
+                                            x-transition:enter-end="transform opacity-100 scale-100"
+                                            x-transition:leave="transition ease-in duration-75"
+                                            x-transition:leave-start="transform opacity-100 scale-100"
+                                            x-transition:leave-end="transform opacity-0 scale-95"
+                                            @click.outside="open = false"
+                                            class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
+                                            <ul class="fi-dropdown-list p-1">
+                                                <template x-for="option in filteredOptions" :key="option.id">
+                                                    <li @click="selectOption(option)"
+                                                        :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subtype_id === option.id }"
+                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                        <span x-text="option.name"></span>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
                         </td>
 
                         <!-- Normal Balance -->
