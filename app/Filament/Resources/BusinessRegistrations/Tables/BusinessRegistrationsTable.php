@@ -28,12 +28,13 @@ class BusinessRegistrationsTable
                     ->label('TIN Number')
                     ->sortable()
                     ->searchable()
+                    ->copyable()
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('business_email')
                     ->label('Business Email')
                     ->sortable()
                     ->searchable()
-                    ->icon('heroicon-m-envelope')
+                    ->copyable()
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('user.name')
                     ->label('Owner')
@@ -46,12 +47,23 @@ class BusinessRegistrationsTable
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('businessType.name')
                     ->label('Business Type')
+                    ->badge()
                     ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: false),
+                Tables\Columns\TextColumn::make('industryTypes.name')
+                    ->label('Industry Types')
+                    ->badge()
+                    ->separator(',')
+                    ->toggleable(isToggledHiddenByDefault: false),
+                Tables\Columns\TextColumn::make('taxTypes.name')
+                    ->label('Tax Types')
+                    ->badge()
+                    ->separator(',')
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('region.name')
                     ->label('Region')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: false),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('province.name')
                     ->label('Province')
                     ->sortable()
@@ -71,28 +83,18 @@ class BusinessRegistrationsTable
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('building_name')
                     ->label('Building')
-                    ->toggleable(isToggledHiddenByDefault: false),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('unit_number')
                     ->label('Unit Number')
-                    ->toggleable(isToggledHiddenByDefault: false),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('postal_code')
                     ->label('Postal Code')
-                    ->toggleable(isToggledHiddenByDefault: false),
-                Tables\Columns\TextColumn::make('industryTypes.name')
-                    ->label('Industry Types')
-                    ->badge()
-                    ->separator(',')
-                    ->toggleable(isToggledHiddenByDefault: false),
-                Tables\Columns\TextColumn::make('taxTypes.name')
-                    ->label('Tax Types')
-                    ->badge()
-                    ->separator(',')
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('governmentRegistrations.governmentAgency.name')
                     ->label('Government Agencies')
                     ->badge()
                     ->separator(',')
-                    ->toggleable(isToggledHiddenByDefault: false),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
