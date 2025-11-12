@@ -1,223 +1,78 @@
+{{-- resources/views/welcome.blade.php --}}
 @extends('layouts.app')
 
-@section('title', 'Welcome - Fairpoint')
+@section('title', 'Fairpoint - Smart Accounting')
 
 @section('content')
-<style>
-    .hero-section {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 4rem 2rem;
-        text-align: center;
-        margin-bottom: 3rem;
-    }
-    .hero-title {
-        font-size: 3.5rem;
-        font-weight: bold;
-        margin-bottom: 1rem;
-        text-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .hero-subtitle {
-        font-size: 1.5rem;
-        opacity: 0.95;
-        margin-bottom: 2rem;
-    }
-    .hero-button {
-        display: inline-block;
-        background: white;
-        color: #667eea;
-        padding: 1rem 2rem;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 600;
-        font-size: 1.125rem;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .hero-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-    }
-    .features-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-        gap: 2rem;
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: 0 2rem 3rem;
-    }
-    .feature-card {
-        background: white;
-        padding: 2.5rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-        transition: transform 0.3s, box-shadow 0.3s;
-        border-top: 4px solid;
-    }
-    .feature-card:nth-child(1) { border-top-color: #f56565; }
-    .feature-card:nth-child(2) { border-top-color: #ed8936; }
-    .feature-card:nth-child(3) { border-top-color: #48bb78; }
-    .feature-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 12px 24px rgba(0,0,0,0.15);
-    }
-    .feature-icon {
-        font-size: 3.5rem;
-        margin-bottom: 1.5rem;
-        display: block;
-    }
-    .feature-title {
-        font-size: 1.75rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
-        color: #1a202c;
-    }
-    .feature-description {
-        color: #718096;
-        line-height: 1.7;
-        margin-bottom: 1.5rem;
-        font-size: 1.05rem;
-    }
-    .feature-link {
-        color: #667eea;
-        text-decoration: none;
-        font-weight: 600;
-        display: inline-flex;
-        align-items: center;
-        transition: color 0.2s;
-    }
-    .feature-link:hover {
-        color: #764ba2;
-    }
-    .cta-section {
-        background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-        color: white;
-        padding: 3rem 2rem;
-        border-radius: 12px;
-        text-align: center;
-        max-width: 1200px;
-        margin: 0 auto 3rem;
-    }
-    .cta-title {
-        font-size: 2.5rem;
-        font-weight: bold;
-        margin-bottom: 1rem;
-    }
-    .cta-subtitle {
-        font-size: 1.25rem;
-        margin-bottom: 2rem;
-        opacity: 0.95;
-    }
-    .cta-button {
-        display: inline-block;
-        background: white;
-        color: #f5576c;
-        padding: 1rem 2.5rem;
-        border-radius: 8px;
-        text-decoration: none;
-        font-weight: 700;
-        font-size: 1.125rem;
-        transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .cta-button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
-    }
-    .stats-section {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 2rem;
-        max-width: 1200px;
-        margin: 0 auto 3rem;
-        padding: 0 2rem;
-    }
-    .stat-card {
-        background: white;
-        padding: 2rem;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.07);
-        text-align: center;
-    }
-    .stat-number {
-        font-size: 3rem;
-        font-weight: bold;
-        color: #667eea;
-        margin-bottom: 0.5rem;
-    }
-    .stat-label {
-        color: #718096;
-        font-size: 1.125rem;
-    }
-</style>
 
-<div class="hero-section">
-    <div style="max-width: 900px; margin: 0 auto;">
-        <h1 class="hero-title">🚀 Welcome to Fairpoint</h1>
-        <p class="hero-subtitle">Build amazing applications with Laravel's powerful framework</p>
-        <a href="https://laravel.com/docs" target="_blank" class="hero-button">Get Started</a>
-    </div>
-</div>
+{{-- HERO --}}
+<section class="pt-16 pb-16 text-center bg-gradient-to-b from-white to-slate-50 dark:from-slate-900 dark:to-slate-950">
+    <div class="container mx-auto px-6 lg:px-8">
+        <span class="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 text-sm font-medium px-4 py-1.5 rounded-full mb-6">
+            Built for Philippine Taxation
+        </span>
 
-<div class="stats-section">
-    <div class="stat-card">
-        <div class="stat-number">10K+</div>
-        <div class="stat-label">Active Users</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-number">500+</div>
-        <div class="stat-label">Projects Built</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-number">99.9%</div>
-        <div class="stat-label">Uptime</div>
-    </div>
-    <div class="stat-card">
-        <div class="stat-number">24/7</div>
-        <div class="stat-label">Support</div>
-    </div>
-</div>
+        <h1 class="text-5xl lg:text-6xl font-bold text-slate-900 dark:text-white mb-6 leading-tight">
+            Smart Accounting for <span class="text-primary">Businesses</span>
+        </h1>
 
-<div class="features-grid">
-    <div class="feature-card">
-        <span class="feature-icon">📚</span>
-        <h3 class="feature-title">Comprehensive Docs</h3>
-        <p class="feature-description">
-            Laravel has wonderful, thorough documentation covering every aspect of the framework. Whether you're new or experienced, you'll find what you need.
+        <p class="text-lg text-slate-600 dark:text-slate-300 mb-10 max-w-3xl mx-auto leading-relaxed">
+            Automate your Philippine tax computations, manage your books, and stay compliant with BIR requirements. Built by accountants, for Filipino entrepreneurs.
         </p>
-        <a href="https://laravel.com/docs" target="_blank" class="feature-link">
-            Read the documentation →
-        </a>
-    </div>
 
-    <div class="feature-card">
-        <span class="feature-icon">🎥</span>
-        <h3 class="feature-title">Video Tutorials</h3>
-        <p class="feature-description">
-            Laracasts offers thousands of video tutorials on Laravel, PHP, and JavaScript. Perfect for visual learners who want to level up their skills.
-        </p>
-        <a href="https://laracasts.com" target="_blank" class="feature-link">
-            Start learning →
-        </a>
-    </div>
+        <div class="flex flex-col sm:flex-row gap-6 justify-center mb-16">
+            <a href="/" class="inline-flex items-center justify-center bg-primary text-white w-64 h-16 rounded-full text-xl font-semibold shadow-lg hover:shadow-xl hover:bg-[#2BA3E6] transition-all duration-300">
+                Get Started Free
+            </a>
+            <button type="button" class="inline-flex items-center justify-center bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-2 border-slate-300 dark:border-slate-600 w-64 h-16 rounded-full text-xl font-semibold shadow-md hover:shadow-lg transition-all duration-300">
+                Watch Demo
+            </button>
+        </div>
 
-    <div class="feature-card">
-        <span class="feature-icon">📰</span>
-        <h3 class="feature-title">Latest News</h3>
-        <p class="feature-description">
-            Stay up to date with the latest Laravel news, packages, tutorials, and community updates. Never miss what's new in the ecosystem.
-        </p>
-        <a href="https://laravel-news.com" target="_blank" class="feature-link">
-            Read the news →
-        </a>
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-8 text-sm text-slate-600 dark:text-slate-400">
+            <div class="flex items-center gap-2">
+                <div class="flex text-yellow-400">
+                    @for($i = 0; $i < 5; $i++)
+                        <svg class="w-5 h-5 fill-current" viewBox="0 0 20 20"><path d="M10 15l-5.878 3.09 1.123-6.545L.489 6.91l6.572-.955L10 0l2.939 5.955 6.572.955-4.756 4.635 1.123 6.545z"/></svg>
+                    @endfor
+                </div>
+                <span class="font-semibold">4.9/5 Rating</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-842.1m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <span class="font-semibold">500 Customers</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                <span class="font-semibold">1000+ Businesses</span>
+            </div>
+        </div>
     </div>
-</div>
+</section>
 
-<div style="max-width: 1200px; margin: 0 auto; padding: 0 2rem;">
-    <div class="cta-section">
-        <h2 class="cta-title">Ready to Build Something Amazing?</h2>
-        <p class="cta-subtitle">Laravel gives you all the tools you need to create modern, powerful web applications</p>
-        <a href="https://laravel.com" target="_blank" class="cta-button">
-            Explore Laravel
-        </a>
+{{-- FEATURES --}}
+<section id="features" class="py-20 bg-white dark:bg-slate-800">
+    <div class="container mx-auto px-6 lg:px-8">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl font-bold text-slate-900 dark:text-white mb-4">Everything you need for Philippine accounting</h2>
+            <p class="text-xl text-slate-600 dark:text-slate-300 max-w-2xl mx-auto">From BIR forms to financial reports, we’ve got you covered.</p>
+        </div>
+        <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            @include('partials.features')
+        </div>
     </div>
-</div>
+</section>
+
+{{-- CTA --}}
+<section id="contact" class="py-20 bg-gradient-to-r from-primary to-[#2BA3E6] text-white text-center">
+    <div class="container mx-auto px-6 lg:px-8">
+        <h2 class="text-4xl font-bold mb-6">Ready to simplify your accounting?</h2>
+        <p class="text-xl mb-8 max-w-2xl mx-auto opacity-90">Join thousands of Filipino businesses who trust Fairpoint.</p>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center">
+            <a href="/" class="bg-white text-primary px-8 py-4 rounded-lg text-lg font-semibold hover:bg-gray-50">Get Started Free</a>
+            <button type="button" class="border-2 border-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-white/10">Schedule Demo</button>
+        </div>
+    </div>
+</section>
+
 @endsection
