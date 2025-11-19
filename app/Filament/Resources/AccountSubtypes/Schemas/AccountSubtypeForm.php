@@ -26,12 +26,6 @@ class AccountSubtypeForm
                             ->label('Name')
                             ->required()
                             ->maxLength(100),
-                        Forms\Components\TextInput::make('code')
-                            ->label('Code')
-                            ->numeric()
-                            ->required()
-                            ->minValue(0)
-                            ->maxValue(99),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->inlineLabel()

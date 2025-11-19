@@ -22,12 +22,6 @@ class AccountSubclassForm
                             ->searchable()
                             ->preload()
                             ->required(),
-                        Forms\Components\TextInput::make('code')
-                            ->label('Code')
-                            ->numeric()
-                            ->required()
-                            ->minValue(1)
-                            ->maxValue(9),
                         Forms\Components\TextInput::make('name')
                             ->label('Name')
                             ->required()

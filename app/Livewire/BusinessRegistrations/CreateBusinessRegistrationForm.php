@@ -2,13 +2,17 @@
 
 namespace App\Livewire\BusinessRegistrations;
 
+use App\Models\AccountClass;
+use App\Models\AccountSubclass;
+use App\Models\AccountSubtype;
+use App\Models\AccountType;
+use App\Models\BusinessCoaItem;
 use App\Models\BusinessGovernmentRegistration;
 use App\Models\BusinessRegistration;
 use App\Models\BusinessType;
 use App\Models\COAItemBusinessType;
 use App\Models\COAItemIndustryType;
 use App\Models\COAItemTaxType;
-use App\Models\COATemplateItem;
 use App\Models\FiscalYearPeriod;
 use App\Models\GovernmentAgency;
 use App\Models\IndustryType;
@@ -16,7 +20,10 @@ use App\Models\TaxCategory;
 use App\Models\TaxType;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Yajra\Address\Entities\Barangay;
@@ -64,6 +71,7 @@ class CreateBusinessRegistrationForm extends Component
     public array $governmentAgencies = [];
     public array $taxCategories = [];
     public array $coaPreview = [];
+    // Public but not synced - these are large lookup arrays only used for client-side filtering
     public array $regionLookup = [];
     public array $provinceLookup = [];
     public array $cityLookup = [];
@@ -74,6 +82,13 @@ class CreateBusinessRegistrationForm extends Component
     public array $coaItemsByBusinessType = [];
     public array $coaItemsByIndustryType = [];
     public array $coaItemsByTaxType = [];
+    public array $coaStructure = [
+        'classCodes' => [],
+        'subclassOrders' => [],
+        'typeOrders' => [],
+        'subtypeOrders' => [],
+    ];
+    public array $selectedCoaItems = [];
 
     public ?string $birAgencyId = null;
 
@@ -81,6 +96,9 @@ class CreateBusinessRegistrationForm extends Component
     {
         $this->loadStaticOptions();
         $this->initializeTaxSelections();
+
+        // OPTIMIZED: Load COA data upfront so it's cached and ready
+        $this->loadCoaTemplateData();
         $this->updateCoaPreview();
     }
 
@@ -180,61 +198,150 @@ class CreateBusinessRegistrationForm extends Component
 
     public function submit(): void
     {
-        $this->validate($this->getAllRules());
+        try {
+            $this->validate($this->getAllRules());
 
-        DB::transaction(function () {
-            $data = [
-                'business_name' => $this->business_name,
-                'tin_number' => $this->tin_number,
-                'business_email' => $this->business_email,
-                'region_id' => $this->region_id,
-                'province_id' => $this->province_id,
-                'city_id' => $this->city_id,
-                'barangay_id' => $this->barangay_id,
-                'street_address' => $this->street_address ?: null,
-                'building_name' => $this->building_name ?: null,
-                'unit_number' => $this->unit_number ?: null,
-                'postal_code' => $this->sanitizePostalCode($this->postal_code),
-                'fiscal_year_period_id' => $this->fiscal_year_period_id,
-                'business_type_id' => $this->business_type_id,
-                'is_active' => true,
-                'user_id' => Auth::id(),
-            ];
+            // OPTIMIZED: Single transaction with batch inserts
+            DB::transaction(function () {
+                $now = now();
+                $userId = Auth::id();
 
-            /** @var BusinessRegistration $businessRegistration */
-            $businessRegistration = BusinessRegistration::create($data);
-
-            if (! empty($this->industry_type_ids)) {
-                $businessRegistration->industryTypes()->sync($this->industry_type_ids);
-            }
-
-            $taxTypeIds = $this->collectSelectedTaxTypeIds();
-            if (! empty($taxTypeIds)) {
-                $businessRegistration->taxTypes()->sync($taxTypeIds);
-            }
-
-            foreach ($this->government_agency_ids as $agencyId) {
-                BusinessGovernmentRegistration::create([
-                    'business_registration_id' => $businessRegistration->id,
-                    'government_agency_id' => $agencyId,
+                $data = [
+                    'business_name' => $this->business_name,
+                    'tin_number' => $this->tin_number,
+                    'business_email' => $this->business_email,
+                    'region_id' => $this->region_id,
+                    'province_id' => $this->province_id,
+                    'city_id' => $this->city_id,
+                    'barangay_id' => $this->barangay_id,
+                    'street_address' => $this->street_address ?: null,
+                    'building_name' => $this->building_name ?: null,
+                    'unit_number' => $this->unit_number ?: null,
+                    'postal_code' => $this->sanitizePostalCode($this->postal_code),
+                    'fiscal_year_period_id' => $this->fiscal_year_period_id,
+                    'business_type_id' => $this->business_type_id,
                     'is_active' => true,
-                ]);
-            }
-        });
+                    'user_id' => $userId,
+                ];
 
-        Notification::make()
-            ->success()
-            ->title('Business registration created')
-            ->body('The business registration record is now available in the listings.')
-            ->send();
+                /** @var BusinessRegistration $businessRegistration */
+                $businessRegistration = BusinessRegistration::create($data);
+                $businessId = $businessRegistration->id;
 
-        $this->redirectRoute('filament.app.resources.business-registrations.index');
+                // OPTIMIZED: Batch insert for industry types (faster than sync)
+                if (! empty($this->industry_type_ids)) {
+                    $industryData = array_map(function ($industryId) use ($businessId, $now) {
+                        return [
+                            'business_registration_id' => $businessId,
+                            'industry_type_id' => $industryId,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }, $this->industry_type_ids);
+                    DB::table('business_registration_industry_types')->insert($industryData);
+                }
+
+                // OPTIMIZED: Batch insert for tax types (faster than sync)
+                $taxTypeIds = $this->collectSelectedTaxTypeIds();
+                if (! empty($taxTypeIds)) {
+                    $taxData = array_map(function ($taxId) use ($businessId, $now) {
+                        return [
+                            'business_registration_id' => $businessId,
+                            'tax_type_id' => $taxId,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }, $taxTypeIds);
+                    DB::table('business_registration_tax_types')->insert($taxData);
+                }
+
+                // OPTIMIZED: Batch insert for government registrations
+                if (! empty($this->government_agency_ids)) {
+                    $agencyData = array_map(function ($agencyId) use ($businessId, $now) {
+                        return [
+                            'id' => (string) Str::uuid(),
+                            'business_registration_id' => $businessId,
+                            'government_agency_id' => $agencyId,
+                            'is_active' => true,
+                            'created_at' => $now,
+                            'updated_at' => $now,
+                        ];
+                    }, $this->government_agency_ids);
+                    DB::table('business_government_registrations')->insert($agencyData);
+                }
+
+                if (! empty($this->selectedCoaItems)) {
+                    $coaItems = collect($this->selectedCoaItems)
+                        ->filter(fn ($item) => filled($item['coa_item_id'] ?? null) && filled($item['account_code'] ?? null))
+                        ->map(function ($item) use ($businessId, $now) {
+                            $normalBalance = strtolower($item['normal_balance'] ?? 'debit');
+                            if (! in_array($normalBalance, ['debit', 'credit'], true)) {
+                                $normalBalance = 'debit';
+                            }
+
+                            return [
+                                'id' => (string) Str::uuid(),
+                                'business_id' => $businessId,
+                                'coa_item_id' => $item['coa_item_id'],
+                                'account_code' => $item['account_code'],
+                                'normal_balance' => $normalBalance,
+                                'is_active' => (bool) ($item['is_active'] ?? true),
+                                'created_at' => $now,
+                                'updated_at' => $now,
+                            ];
+                        })
+                        ->values();
+
+                    if ($coaItems->isNotEmpty()) {
+                        BusinessCoaItem::insert($coaItems->toArray());
+                    }
+                }
+            });
+
+            Notification::make()
+                ->success()
+                ->title('Business registration created')
+                ->body('The business registration record is now available in the listings.')
+                ->send();
+
+            $this->redirectRoute('filament.app.resources.business-registrations.index');
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            throw $e;
+        } catch (\Exception $e) {
+            Log::error('Business registration submission failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            Notification::make()
+                ->danger()
+                ->title('Error creating business registration')
+                ->body('An error occurred while creating the business registration. Please try again.')
+                ->send();
+        }
     }
 
     public function getCoaPreview(): array
     {
         $this->updateCoaPreview();
         return $this->coaPreview;
+    }
+
+    public function loadCoaData(): array
+    {
+        // Lazy load COA data only when needed
+        if (empty($this->allCoaItems)) {
+            $this->loadCoaTemplateData();
+        }
+
+        return [
+            'allCoaItems' => $this->allCoaItems,
+            'coaItemsByBusinessType' => $this->coaItemsByBusinessType,
+            'coaItemsByIndustryType' => $this->coaItemsByIndustryType,
+            'coaItemsByTaxType' => $this->coaItemsByTaxType,
+            'coaStructure' => $this->coaStructure,
+            'selectedCoaItems' => $this->selectedCoaItems,
+        ];
     }
 
     public function render()
@@ -244,9 +351,6 @@ class CreateBusinessRegistrationForm extends Component
 
     protected function loadStaticOptions(): void
     {
-        // Load all COA template items with relationships for client-side filtering
-        $this->loadCoaTemplateData();
-
         $regionCollection = Region::query()
             ->orderBy('name')
             ->get();
@@ -493,41 +597,172 @@ class CreateBusinessRegistrationForm extends Component
 
     protected function loadCoaTemplateData(): void
     {
-        // Load all active COA template items with relationships
-        $coaItems = COATemplateItem::query()
-            ->where('is_active', true)
-            ->with('accountSubtype.accountType.accountSubclass.accountClass')
-            ->orderBy('account_code')
-            ->get()
-            ->map(function (COATemplateItem $item) {
-                return [
-                    'id' => $item->id,
-                    'account_code' => $item->account_code,
-                    'account_name' => $item->account_name,
-                    'account_subtype' => $item->accountSubtype?->name ?? 'N/A',
-                    'normal_balance' => ucfirst($item->normal_balance ?? 'N/A'),
-                    'is_default' => $item->is_default,
-                ];
-            })
-            ->toArray();
+        // OPTIMIZED: Cache COA data for 1 hour to avoid repeated DB queries
+        $cachedData = Cache::remember('coa_template_data_v2', 3600, function () {
+            // Normalize all IDs to strings for consistent client-side matching
+            $classCodes = AccountClass::where('is_active', true)
+                ->orderBy('code')
+                ->get(['id', 'code'])
+                ->mapWithKeys(fn ($class) => [(string) $class->id => str_pad((string) $class->code, 1, '0', STR_PAD_LEFT)])
+                ->toArray();
 
-        $this->allCoaItems = $coaItems;
+            $subclassOrders = AccountSubclass::where('is_active', true)
+                ->orderBy('account_class_id')
+                ->orderBy('name')
+                ->get(['id', 'account_class_id'])
+                ->groupBy('account_class_id')
+                ->map(fn ($group) => $group->values())
+                ->flatMap(fn ($group) => $group->mapWithKeys(fn ($subclass, $index) => [(string) $subclass->id => $index + 1]))
+                ->toArray();
 
-        // Build lookup tables for each item ID by type
-        $businessTypeRelations = COAItemBusinessType::query()->get();
-        foreach ($businessTypeRelations as $relation) {
-            $this->coaItemsByBusinessType[$relation->business_type_id][] = $relation->account_item_id;
-        }
+            $typeOrders = AccountType::where('is_active', true)
+                ->orderBy('account_subclass_id')
+                ->orderBy('name')
+                ->get(['id', 'account_subclass_id'])
+                ->groupBy('account_subclass_id')
+                ->map(fn ($group) => $group->values())
+                ->flatMap(fn ($group) => $group->mapWithKeys(fn ($type, $index) => [(string) $type->id => $index + 1]))
+                ->toArray();
 
-        $industryTypeRelations = COAItemIndustryType::query()->get();
-        foreach ($industryTypeRelations as $relation) {
-            $this->coaItemsByIndustryType[$relation->industry_type_id][] = $relation->account_item_id;
-        }
+            $subtypeOrders = AccountSubtype::where('is_active', true)
+                ->orderBy('account_type_id')
+                ->orderBy('name')
+                ->get(['id', 'account_type_id'])
+                ->groupBy('account_type_id')
+                ->map(fn ($group) => $group->values())
+                ->flatMap(fn ($group) => $group->mapWithKeys(fn ($subtype, $index) => [(string) $subtype->id => $index]))
+                ->toArray();
 
-        $taxTypeRelations = COAItemTaxType::query()->get();
-        foreach ($taxTypeRelations as $relation) {
-            $this->coaItemsByTaxType[$relation->tax_type_id][] = $relation->account_item_id;
-        }
+            // Use a single efficient query with left join instead of deep eager loading
+            $coaItems = DB::table('coa_template_items as cti')
+                ->select([
+                    'cti.id',
+                    'cti.account_name',
+                    'cti.normal_balance',
+                    'cti.is_default',
+                    'cti.is_active',
+                    'cti.account_subtype_id',
+                    'ast.name as account_subtype_name',
+                    'ast.account_type_id',
+                    'aty.name as account_type_name',
+                    'aty.account_subclass_id',
+                    'asc.name as account_subclass_name',
+                    'asc.account_class_id',
+                    'acl.name as account_class_name',
+                    'acl.code as account_class_code',
+                ])
+                ->leftJoin('account_subtypes as ast', 'cti.account_subtype_id', '=', 'ast.id')
+                ->leftJoin('account_types as aty', 'ast.account_type_id', '=', 'aty.id')
+                ->leftJoin('account_subclasses as asc', 'aty.account_subclass_id', '=', 'asc.id')
+                ->leftJoin('account_classes as acl', 'asc.account_class_id', '=', 'acl.id')
+                ->where('cti.is_active', true)
+                ->orderBy('cti.account_name')
+                ->get()
+                ->map(function ($item) {
+                    // Debug: Log first few items to check data
+                    static $logged = 0;
+                    if ($logged < 3 && $item->id) {
+                        Log::debug('COA Item sample data #' . ($logged + 1), [
+                            'id' => $item->id,
+                            'account_name' => $item->account_name,
+                            'account_subtype_id' => $item->account_subtype_id,
+                            'account_type_id' => $item->account_type_id,
+                            'account_subclass_id' => $item->account_subclass_id,
+                            'account_class_id' => $item->account_class_id,
+                            'account_class_name' => $item->account_class_name,
+                            'account_subclass_name' => $item->account_subclass_name,
+                            'account_type_name' => $item->account_type_name,
+                            'account_subtype_name' => $item->account_subtype_name,
+                            'account_class_code' => $item->account_class_code,
+                        ]);
+                        $logged++;
+                    }
+
+                    // Check if values are null or empty string - be more explicit
+                    $accountClassName = isset($item->account_class_name) && $item->account_class_name !== '' && $item->account_class_name !== null
+                        ? (string) $item->account_class_name
+                        : 'N/A';
+                    $accountSubclassName = isset($item->account_subclass_name) && $item->account_subclass_name !== '' && $item->account_subclass_name !== null
+                        ? (string) $item->account_subclass_name
+                        : 'N/A';
+                    $accountTypeName = isset($item->account_type_name) && $item->account_type_name !== '' && $item->account_type_name !== null
+                        ? (string) $item->account_type_name
+                        : 'N/A';
+                    $accountSubtypeName = isset($item->account_subtype_name) && $item->account_subtype_name !== '' && $item->account_subtype_name !== null
+                        ? (string) $item->account_subtype_name
+                        : 'N/A';
+
+                    return [
+                        'id' => (string) $item->id, // Normalize to string for consistent client-side matching
+                        'account_name' => $item->account_name,
+                        'account_class_name' => $accountClassName,
+                        'account_subclass_name' => $accountSubclassName,
+                        'account_type_name' => $accountTypeName,
+                        'account_subtype' => $accountSubtypeName,
+                        'account_subtype_id' => $item->account_subtype_id ? (string) $item->account_subtype_id : null,
+                        'account_type_id' => $item->account_type_id ? (string) $item->account_type_id : null,
+                        'account_subclass_id' => $item->account_subclass_id ? (string) $item->account_subclass_id : null,
+                        'account_class_id' => $item->account_class_id ? (string) $item->account_class_id : null,
+                        'account_class_code' => $item->account_class_code ? (string) $item->account_class_code : null,
+                        'normal_balance' => $item->normal_balance ?? 'debit',
+                        'normal_balance_label' => ucfirst($item->normal_balance ?? 'debit'),
+                        'is_default' => (bool) $item->is_default,
+                        'is_active' => (bool) $item->is_active,
+                    ];
+                })
+                ->toArray();
+
+            // Use raw queries to fetch and group relationships in bulk (much faster)
+            // Normalize all IDs to strings for consistent client-side matching
+            $businessTypeRelations = [];
+            foreach (DB::table('coa_item_business_types')->select('business_type_id', 'account_item_id')->get() as $relation) {
+                $businessTypeId = (string) $relation->business_type_id;
+                $accountItemId = (string) $relation->account_item_id;
+                if (!isset($businessTypeRelations[$businessTypeId])) {
+                    $businessTypeRelations[$businessTypeId] = [];
+                }
+                $businessTypeRelations[$businessTypeId][] = $accountItemId;
+            }
+
+            $industryTypeRelations = [];
+            foreach (DB::table('coa_item_industry_types')->select('industry_type_id', 'account_item_id')->get() as $relation) {
+                $industryTypeId = (string) $relation->industry_type_id;
+                $accountItemId = (string) $relation->account_item_id;
+                if (!isset($industryTypeRelations[$industryTypeId])) {
+                    $industryTypeRelations[$industryTypeId] = [];
+                }
+                $industryTypeRelations[$industryTypeId][] = $accountItemId;
+            }
+
+            $taxTypeRelations = [];
+            foreach (DB::table('coa_item_tax_types')->select('tax_type_id', 'account_item_id')->get() as $relation) {
+                $taxTypeId = (string) $relation->tax_type_id;
+                $accountItemId = (string) $relation->account_item_id;
+                if (!isset($taxTypeRelations[$taxTypeId])) {
+                    $taxTypeRelations[$taxTypeId] = [];
+                }
+                $taxTypeRelations[$taxTypeId][] = $accountItemId;
+            }
+
+            return [
+                'items' => $coaItems,
+                'businessTypes' => $businessTypeRelations,
+                'industryTypes' => $industryTypeRelations,
+                'taxTypes' => $taxTypeRelations,
+                'structure' => [
+                    'classCodes' => $classCodes,
+                    'subclassOrders' => $subclassOrders,
+                    'typeOrders' => $typeOrders,
+                    'subtypeOrders' => $subtypeOrders,
+                ],
+            ];
+        });
+
+        $this->allCoaItems = $cachedData['items'];
+        $this->coaItemsByBusinessType = $cachedData['businessTypes'];
+        $this->coaItemsByIndustryType = $cachedData['industryTypes'];
+        $this->coaItemsByTaxType = $cachedData['taxTypes'];
+        $this->coaStructure = $cachedData['structure'];
     }
 
     protected function sanitizePostalCode(?string $postalCode): ?string
@@ -572,60 +807,8 @@ class CreateBusinessRegistrationForm extends Component
 
     protected function updateCoaPreview(): void
     {
-        $coaItemIds = COATemplateItem::query()
-            ->where('is_default', true)
-            ->where('is_active', true)
-            ->pluck('id')
-            ->toArray();
-
-        if ($this->business_type_id) {
-            $businessTypeCoaIds = COAItemBusinessType::query()
-                ->where('business_type_id', $this->business_type_id)
-                ->pluck('account_item_id')
-                ->toArray();
-            $coaItemIds = array_merge($coaItemIds, $businessTypeCoaIds);
-        }
-
-        if (! empty($this->industry_type_ids)) {
-            $industryTypeCoaIds = COAItemIndustryType::query()
-                ->whereIn('industry_type_id', $this->industry_type_ids)
-                ->pluck('account_item_id')
-                ->toArray();
-            $coaItemIds = array_merge($coaItemIds, $industryTypeCoaIds);
-        }
-
-        $taxTypeIds = $this->collectSelectedTaxTypeIds();
-        if (! empty($taxTypeIds)) {
-            $taxTypeCoaIds = COAItemTaxType::query()
-                ->whereIn('tax_type_id', $taxTypeIds)
-                ->pluck('account_item_id')
-                ->toArray();
-            $coaItemIds = array_merge($coaItemIds, $taxTypeCoaIds);
-        }
-
-        $coaItemIds = array_values(array_unique($coaItemIds));
-
-        if (empty($coaItemIds)) {
-            $this->coaPreview = [];
-
-            return;
-        }
-
-        $this->coaPreview = COATemplateItem::query()
-            ->whereIn('id', $coaItemIds)
-            ->where('is_active', true)
-            ->with('accountSubtype.accountType.accountSubclass.accountClass')
-            ->orderBy('account_code')
-            ->get()
-            ->map(function (COATemplateItem $item) {
-                return [
-                    'account_code' => $item->account_code,
-                    'account_name' => $item->account_name,
-                    'account_subtype' => $item->accountSubtype?->name ?? 'N/A',
-                    'normal_balance' => ucfirst($item->normal_balance ?? 'N/A'),
-                ];
-            })
-            ->toArray();
+        // COA preview is now computed client-side for responsiveness.
+        $this->coaPreview = [];
     }
 
     protected function getStepRules(int $step): array

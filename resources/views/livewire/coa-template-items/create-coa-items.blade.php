@@ -71,14 +71,12 @@
                 this.item.account_type_name = '';
                 this.item.account_subtype_id = '';
                 this.item.account_subtype_name = '';
-                this.item.account_code = '';
                 this.open = false;
             }
         };
     },
     addItem() {
         this.items.push({
-            account_code: '',
             account_name: '',
             account_class_id: '',
             account_class_name: '',
@@ -240,7 +238,6 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width: 100px;">Account Code</th>
                     <th>Account Name<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
                     <th>Account Class<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
                     <th>Account Subclass<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
@@ -260,20 +257,6 @@
             <tbody>
                 <template x-for="(item, index) in items" :key="index">
                     <tr>
-                        <!-- Account Code -->
-                        <td class="min-w-[100px]">
-                            <div class="fi-input-wrp fi-disabled fi-fo-text-input">
-                                <div class="fi-input-wrp-content-ctn">
-                                    <input type="text"
-                                           x-model="item.account_code"
-                                           readonly
-                                           disabled
-                                           class="fi-input"
-                                           placeholder="Auto">
-                                </div>
-                            </div>
-                        </td>
-
                         <!-- Account Name -->
                         <td class="min-w-64">
                              <div class="fi-input-wrp fi-fo-text-input">
@@ -350,7 +333,6 @@
                                         this.item.account_type_name = '';
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
-                                        this.item.account_code = '';
                                         this.searchText = '';
                                     }
                                 });
@@ -367,7 +349,6 @@
                                         this.item.account_type_name = '';
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
-                                        this.item.account_code = '';
                                     }
                                 });
                                 this.$watch('item.account_subclass_name', () => {
@@ -475,7 +456,6 @@
                                         this.item.account_type_name = '';
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
-                                        this.item.account_code = '';
                                         this.searchText = '';
                                     }
                                 });
@@ -489,7 +469,6 @@
                                     if (!this.item.account_type_id) {
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
-                                        this.item.account_code = '';
                                     }
                                 });
                                 this.$watch('item.account_type_name', () => {
@@ -593,7 +572,6 @@
                                     if (!this.item.account_type_id && !this.item.account_type_name) {
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
-                                        this.item.account_code = '';
                                         this.searchText = '';
                                     }
                                 });
@@ -617,13 +595,11 @@
                                         if (!exactMatch && (this.item.account_type_id || this.item.account_type_name)) {
                                             this.item.account_subtype_name = newValue;
                                             this.item.account_subtype_id = '';
-                                            this.item.account_code = '';
                                         }
                                     } else {
                                         this.filteredOptions = this.getAvailableOptions();
                                         this.item.account_subtype_name = '';
                                         this.item.account_subtype_id = '';
-                                        this.item.account_code = '';
                                     }
                                 });
                             },
@@ -645,9 +621,7 @@
                                 this.selectedLabel = option.name;
                                 this.searchText = option.name;
                                 this.item.account_subtype_name = option.name;
-                                this.item.account_code = '';
                                 this.open = false;
-                                $wire.generateAccountCode(index);
                             }
                         }" x-init="init()">
                             <div :class="{ 'fi-disabled': !item.account_type_id && !item.account_type_name }">

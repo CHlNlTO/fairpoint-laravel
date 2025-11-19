@@ -19,16 +19,15 @@ class COATemplateItemsTable
     {
         return $table
             ->columns([
-                TextColumn::make('account_code')
-                    ->label('Code')
-                    ->sortable()
-                    ->searchable()
-                    ->badge()
-                    ->color('primary'),
                 TextColumn::make('account_name')
                     ->label('Name')
                     ->sortable()
                     ->searchable(),
+                TextColumn::make('accountSubtype.accountType.accountSubclass.accountClass.code')
+                    ->label('Class Code')
+                    ->sortable()
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('accountSubtype.accountType.accountSubclass.accountClass.name')
                     ->label('Class')
                     ->sortable()
@@ -113,6 +112,6 @@ class COATemplateItemsTable
                     DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('account_code', 'asc');
+            ->defaultSort('accountSubtype.accountType.accountSubclass.accountClass.code', 'asc');
     }
 }

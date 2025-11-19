@@ -57,44 +57,37 @@ class CreateCOAItems extends Component
             ->toArray();
 
         $this->accountSubclasses = AccountSubclass::where('is_active', true)
-            ->orderBy('code')
+            ->orderBy('name')
             ->get()
             ->map(function ($subclass) {
                 return [
                     'id' => $subclass->id,
                     'account_class_id' => $subclass->account_class_id,
-                    'code' => $subclass->code,
                     'name' => $subclass->name,
                 ];
             })
             ->toArray();
 
         $this->accountTypes = AccountType::where('is_active', true)
-            ->orderBy('code')
+            ->orderBy('name')
             ->get()
             ->map(function ($type) {
                 return [
                     'id' => $type->id,
                     'account_subclass_id' => $type->account_subclass_id,
-                    'code' => $type->code,
                     'name' => $type->name,
                 ];
             })
             ->toArray();
 
-        $this->accountSubtypes = AccountSubtype::with(['accountType.accountSubclass.accountClass'])
-            ->where('is_active', true)
-            ->orderBy('code')
+        $this->accountSubtypes = AccountSubtype::where('is_active', true)
+            ->orderBy('name')
             ->get()
             ->map(function ($subtype) {
                 return [
                     'id' => $subtype->id,
                     'account_type_id' => $subtype->account_type_id,
-                    'code' => $subtype->code,
                     'name' => $subtype->name,
-                    'class_code' => $subtype->accountType->accountSubclass->accountClass->code,
-                    'subclass_code' => $subtype->accountType->accountSubclass->code,
-                    'type_code' => $subtype->accountType->code,
                 ];
             })
             ->toArray();
@@ -133,100 +126,10 @@ class CreateCOAItems extends Component
             ->toArray();
     }
 
-    public function generateAccountCode($index)
-    {
-        if (!isset($this->items[$index]['account_subtype_id']) || !$this->items[$index]['account_subtype_id']) {
-            $this->items[$index]['account_code'] = '';
-            return;
-        }
-
-        $subtypeId = $this->items[$index]['account_subtype_id'];
-        $subtype = collect($this->accountSubtypes)->firstWhere('id', $subtypeId);
-
-        if (!$subtype) {
-            // Try to load from database if not in cached data
-            $subtypeModel = AccountSubtype::with(['accountType.accountSubclass.accountClass'])->find($subtypeId);
-            if ($subtypeModel) {
-                $subtype = [
-                    'id' => $subtypeModel->id,
-                    'account_type_id' => $subtypeModel->account_type_id,
-                    'code' => $subtypeModel->code,
-                    'name' => $subtypeModel->name,
-                    'class_code' => $subtypeModel->accountType->accountSubclass->accountClass->code,
-                    'subclass_code' => $subtypeModel->accountType->accountSubclass->code,
-                    'type_code' => $subtypeModel->accountType->code,
-                ];
-                // Add to cached data
-                $this->accountSubtypes[] = $subtype;
-            } else {
-            return;
-            }
-        }
-
-        // Generate base code
-        $classCode = str_pad((string)$subtype['class_code'], 1, '0', STR_PAD_LEFT);
-        $subclassCode = str_pad((string)$subtype['subclass_code'], 1, '0', STR_PAD_LEFT);
-        $typeCode = str_pad((string)$subtype['type_code'], 2, '0', STR_PAD_LEFT);
-
-        // Collect used suffixes from database
-        $usedSuffixes = [];
-
-        $existingCodesQuery = COATemplateItem::where('account_subtype_id', $subtypeId);
-
-        if (!empty($this->ignoreCoaItemIds)) {
-            $existingCodesQuery->whereNotIn('id', $this->ignoreCoaItemIds);
-        }
-
-        $existingCodes = $existingCodesQuery
-            ->pluck('account_code')
-            ->toArray();
-
-        foreach ($existingCodes as $code) {
-            if (strlen($code) < 2) {
-                continue;
-            }
-
-            $lastTwo = substr($code, -2);
-            if (ctype_digit($lastTwo)) {
-                $usedSuffixes[] = (int) $lastTwo;
-            }
-        }
-
-        // Include codes from current form items (excluding the current index)
-        foreach ($this->items as $itemIndex => $item) {
-            if ($itemIndex === $index) {
-                continue;
-            }
-
-            if (
-                isset($item['account_code'], $item['account_subtype_id']) &&
-                $item['account_code'] &&
-                $item['account_subtype_id'] === $subtypeId
-            ) {
-                $suffix = substr($item['account_code'], -2);
-                if (ctype_digit($suffix)) {
-                    $usedSuffixes[] = (int) $suffix;
-                }
-            }
-        }
-
-        $usedSuffixes = array_unique($usedSuffixes);
-
-        // Find the lowest available suffix starting from 0
-        $nextNumber = 0;
-        while (in_array($nextNumber, $usedSuffixes, true)) {
-            $nextNumber++;
-        }
-
-        $nextSubtypeCode = str_pad($nextNumber, 2, '0', STR_PAD_LEFT);
-
-        $this->items[$index]['account_code'] = $classCode . $subclassCode . $typeCode . $nextSubtypeCode;
-    }
 
     public function downloadTemplate()
     {
         $headers = [
-            'Account Code',
             'Account Name',
             'Account Class',
             'Account Subclass',
@@ -250,7 +153,6 @@ class CreateCOAItems extends Component
 
         // Write example row
         fputcsv($file, [
-            '110100',
             'Petty Cash Fund',
             'Assets',
             'Current Assets',
@@ -293,7 +195,6 @@ class CreateCOAItems extends Component
         // Read and validate header
         $header = fgetcsv($file);
         $expectedHeaders = [
-            'Account Code',
             'Account Name',
             'Account Class',
             'Account Subclass',
@@ -323,29 +224,28 @@ class CreateCOAItems extends Component
                 continue;
             }
 
-            if (count($row) !== 11) {
+            if (count($row) !== 10) {
                 continue; // Skip invalid rows
             }
 
             // Map CSV row to item structure
             $item = [
-                'account_code' => trim($row[0]) ?: '',
-                'account_name' => trim($row[1]) ?: '',
-                'account_class_name' => trim($row[2]) ?: '', // Store name for matching
-                'account_subclass_name' => trim($row[3]) ?: '',
-                'account_type_name' => trim($row[4]) ?: '',
-                'account_subtype_name' => trim($row[5]) ?: '',
-                'normal_balance' => strtolower(trim($row[6])) === 'credit' ? 'credit' : 'debit',
-                'tax_type_name' => trim($row[7]) ?: '',
-                'industry_type_name' => trim($row[8]) ?: '',
-                'business_type_name' => trim($row[9]) ?: '',
+                'account_name' => trim($row[0]) ?: '',
+                'account_class_name' => trim($row[1]) ?: '', // Store name for matching
+                'account_subclass_name' => trim($row[2]) ?: '',
+                'account_type_name' => trim($row[3]) ?: '',
+                'account_subtype_name' => trim($row[4]) ?: '',
+                'normal_balance' => strtolower(trim($row[5])) === 'credit' ? 'credit' : 'debit',
+                'tax_type_name' => trim($row[6]) ?: '',
+                'industry_type_name' => trim($row[7]) ?: '',
+                'business_type_name' => trim($row[8]) ?: '',
                 // Initialize IDs (will be set during matching)
                 'account_class_id' => '',
                 'account_subclass_id' => '',
                 'account_type_id' => '',
                 'account_subtype_id' => '',
                 'is_active' => true,
-                'is_default' => strtolower(trim($row[10])) === 'yes',
+                'is_default' => strtolower(trim($row[9])) === 'yes',
                 'business_type_ids' => [],
                 'industry_type_ids' => [],
                 'tax_type_ids' => [],
@@ -364,7 +264,6 @@ class CreateCOAItems extends Component
 
             Log::debug('CSV row processed', [
                 'row_number' => $rowNumber,
-                'account_code' => $item['account_code'],
                 'account_name' => $item['account_name'],
                 'account_class_name' => $item['account_class_name'],
                 'account_class_id' => $item['account_class_id'],
@@ -385,7 +284,6 @@ class CreateCOAItems extends Component
         Log::info('Items before CSV import', [
             'existing_items_count' => count($this->items),
             'first_item' => !empty($this->items[0]) ? [
-                'account_code' => $this->items[0]['account_code'] ?? 'N/A',
                 'account_name' => $this->items[0]['account_name'] ?? 'N/A',
                 'account_class_id' => $this->items[0]['account_class_id'] ?? 'N/A',
             ] : 'No items',
@@ -400,23 +298,11 @@ class CreateCOAItems extends Component
         Log::info('CSV import completed', [
             'total_rows' => count($parsedItems),
             'first_item_after_import' => !empty($parsedItems[0]) ? [
-                'account_code' => $parsedItems[0]['account_code'] ?? 'N/A',
                 'account_name' => $parsedItems[0]['account_name'] ?? 'N/A',
                 'account_class_id' => $parsedItems[0]['account_class_id'] ?? 'N/A',
                 'account_subtype_id' => $parsedItems[0]['account_subtype_id'] ?? 'N/A',
             ] : 'No items',
         ]);
-
-        // Generate account codes for items with matched subtypes but no code provided
-        foreach ($this->items as $index => $item) {
-            if ($item['account_subtype_id'] && empty($item['account_code'])) {
-                Log::debug('Generating missing account code after CSV import', [
-                    'item_index' => $index,
-                    'account_subtype_id' => $item['account_subtype_id'],
-                ]);
-                $this->generateAccountCode($index);
-            }
-        }
 
         session()->flash('success', count($parsedItems) . ' items imported from CSV successfully.');
         $this->csvFile = null; // Clear the file input
@@ -537,37 +423,6 @@ class CreateCOAItems extends Component
         }
     }
 
-    protected function getNextAccountClassCode()
-    {
-        $maxCode = AccountClass::max('code') ?? 0;
-        return $maxCode + 1;
-    }
-
-    protected function getNextAccountSubclassCode($accountClassId)
-    {
-        $maxCode = AccountSubclass::where('account_class_id', $accountClassId)
-            ->max('code') ?? 0;
-        return $maxCode + 1;
-    }
-
-    protected function getNextAccountTypeCode($accountSubclassId)
-    {
-        $maxCode = AccountType::where('account_subclass_id', $accountSubclassId)
-            ->max('code') ?? 0;
-        return $maxCode + 1;
-    }
-
-    protected function getNextAccountSubtypeCode($accountTypeId)
-    {
-        $maxCode = AccountSubtype::where('account_type_id', $accountTypeId)
-            ->max('code');
-
-        if (is_null($maxCode)) {
-            return 0;
-        }
-
-        return $maxCode + 1;
-    }
 
     protected function createOrGetAccountClass($name, $normalBalance)
     {
@@ -627,17 +482,14 @@ class CreateCOAItems extends Component
             $this->accountSubclasses[] = [
                 'id' => $accountSubclass->id,
                 'account_class_id' => $accountSubclass->account_class_id,
-                'code' => $accountSubclass->code,
                 'name' => $accountSubclass->name,
             ];
             return $accountSubclass->id;
         }
 
         // Create new
-        $code = $this->getNextAccountSubclassCode($accountClassId);
         $accountSubclass = AccountSubclass::create([
             'account_class_id' => $accountClassId,
-            'code' => $code,
             'name' => $name,
             'is_active' => true,
         ]);
@@ -646,7 +498,6 @@ class CreateCOAItems extends Component
         $this->accountSubclasses[] = [
             'id' => $accountSubclass->id,
             'account_class_id' => $accountSubclass->account_class_id,
-            'code' => $accountSubclass->code,
             'name' => $accountSubclass->name,
         ];
 
@@ -672,17 +523,14 @@ class CreateCOAItems extends Component
             $this->accountTypes[] = [
                 'id' => $accountType->id,
                 'account_subclass_id' => $accountType->account_subclass_id,
-                'code' => $accountType->code,
                 'name' => $accountType->name,
             ];
             return $accountType->id;
         }
 
         // Create new
-        $code = $this->getNextAccountTypeCode($accountSubclassId);
         $accountType = AccountType::create([
             'account_subclass_id' => $accountSubclassId,
-            'code' => $code,
             'name' => $name,
             'is_active' => true,
             'is_system_defined' => true,
@@ -692,7 +540,6 @@ class CreateCOAItems extends Component
         $this->accountTypes[] = [
             'id' => $accountType->id,
             'account_subclass_id' => $accountType->account_subclass_id,
-            'code' => $accountType->code,
             'name' => $accountType->name,
         ];
 
@@ -714,151 +561,33 @@ class CreateCOAItems extends Component
             ->where('account_type_id', $accountTypeId)
             ->first();
         if ($accountSubtype) {
-            // Reload with relationships to get codes
-            $accountSubtype->load(['accountType.accountSubclass.accountClass']);
             // Add to loaded data
             $this->accountSubtypes[] = [
                 'id' => $accountSubtype->id,
                 'account_type_id' => $accountSubtype->account_type_id,
-                'code' => $accountSubtype->code,
                 'name' => $accountSubtype->name,
-                'class_code' => $accountSubtype->accountType->accountSubclass->accountClass->code,
-                'subclass_code' => $accountSubtype->accountType->accountSubclass->code,
-                'type_code' => $accountSubtype->accountType->code,
             ];
             return $accountSubtype->id;
         }
 
         // Create new
-        $code = $this->getNextAccountSubtypeCode($accountTypeId);
         $accountSubtype = AccountSubtype::create([
             'account_type_id' => $accountTypeId,
-            'code' => $code,
             'name' => $name,
             'is_active' => true,
             'is_system_defined' => true,
         ]);
 
-        // Load relationships and add to loaded data
-        $accountSubtype->load(['accountType.accountSubclass.accountClass']);
+        // Add to loaded data
         $this->accountSubtypes[] = [
             'id' => $accountSubtype->id,
             'account_type_id' => $accountSubtype->account_type_id,
-            'code' => $accountSubtype->code,
             'name' => $accountSubtype->name,
-            'class_code' => $accountSubtype->accountType->accountSubclass->accountClass->code,
-            'subclass_code' => $accountSubtype->accountType->accountSubclass->code,
-            'type_code' => $accountSubtype->accountType->code,
         ];
 
         return $accountSubtype->id;
     }
 
-    protected function ensureUniqueAccountCodes(): void
-    {
-        // Collect all used codes from database (across ALL subtypes to avoid conflicts)
-        $existingCodesQuery = COATemplateItem::query();
-
-        if (!empty($this->ignoreCoaItemIds)) {
-            $existingCodesQuery->whereNotIn('id', $this->ignoreCoaItemIds);
-        }
-
-        $allExistingCodes = $existingCodesQuery->pluck('account_code')->toArray();
-        // Flip array to use codes as keys for O(1) lookup
-        $usedCodes = array_flip($allExistingCodes);
-
-        Log::debug('ensureUniqueAccountCodes started', [
-            'total_items' => count($this->items),
-            'existing_codes_in_db' => count($allExistingCodes),
-        ]);
-
-        // First pass: Validate and keep codes that were provided in CSV (if they're valid and not in DB)
-        foreach ($this->items as $index => $item) {
-            if (!empty($item['account_subtype_id']) && !empty($item['account_code'])) {
-                $providedCode = $item['account_code'];
-
-                // Check if this code is already in database
-                if (isset($usedCodes[$providedCode])) {
-                    Log::warning('Code from CSV already exists in database, will regenerate', [
-                        'index' => $index,
-                        'account_name' => $item['account_name'],
-                        'provided_code' => $providedCode,
-                    ]);
-                    // Clear it so it gets regenerated
-                    $this->items[$index]['account_code'] = '';
-                } else {
-                    // Valid code, keep it and mark as used
-                    $usedCodes[$providedCode] = true;
-                    Log::debug('Keeping code from CSV', [
-                        'index' => $index,
-                        'account_name' => $item['account_name'],
-                        'code' => $providedCode,
-                    ]);
-                }
-            }
-        }
-
-        // Second pass: Generate codes for items that don't have one
-        foreach ($this->items as $index => $item) {
-            // Skip if already has a valid code
-            if (!empty($item['account_code'])) {
-                continue;
-            }
-
-            if (empty($item['account_subtype_id'])) {
-                continue;
-            }
-
-            // Get subtype information
-            $subtype = collect($this->accountSubtypes)->firstWhere('id', $item['account_subtype_id']);
-
-            if (!$subtype) {
-                $subtypeModel = AccountSubtype::with(['accountType.accountSubclass.accountClass'])->find($item['account_subtype_id']);
-
-                if (!$subtypeModel) {
-                    continue;
-                }
-
-                $subtype = [
-                    'id' => $subtypeModel->id,
-                    'account_type_id' => $subtypeModel->account_type_id,
-                    'code' => $subtypeModel->code,
-                    'name' => $subtypeModel->name,
-                    'class_code' => $subtypeModel->accountType->accountSubclass->accountClass->code,
-                    'subclass_code' => $subtypeModel->accountType->accountSubclass->code,
-                    'type_code' => $subtypeModel->accountType->code,
-                ];
-
-                $this->accountSubtypes[] = $subtype;
-            }
-
-            // Build base code from hierarchy
-            $classCode = str_pad((string) $subtype['class_code'], 1, '0', STR_PAD_LEFT);
-            $subclassCode = str_pad((string) $subtype['subclass_code'], 1, '0', STR_PAD_LEFT);
-            $typeCode = str_pad((string) $subtype['type_code'], 2, '0', STR_PAD_LEFT);
-            $baseCode = $classCode . $subclassCode . $typeCode;
-
-            // Find next available suffix for this base code
-            $suffix = 0;
-            while (isset($usedCodes[$baseCode . str_pad($suffix, 2, '0', STR_PAD_LEFT)])) {
-                $suffix++;
-                if ($suffix > 99) {
-                    Log::error('Ran out of suffixes for base code', ['base_code' => $baseCode]);
-                    break;
-                }
-            }
-
-            $generatedCode = $baseCode . str_pad($suffix, 2, '0', STR_PAD_LEFT);
-            $this->items[$index]['account_code'] = $generatedCode;
-            $usedCodes[$generatedCode] = true;
-
-            Log::debug('Generated new code', [
-                'index' => $index,
-                'account_name' => $item['account_name'],
-                'generated_code' => $generatedCode,
-            ]);
-        }
-    }
 
     public function save()
     {
@@ -913,40 +642,10 @@ class CreateCOAItems extends Component
                 $this->items[$index]['account_subtype_id'] = $subtypeId;
             }
 
-            // Generate account code for items that still don't have subtype_id
+            // Ensure subtype_id is set
             if (empty($this->items[$index]['account_subtype_id']) && !empty($item['account_subtype_id'])) {
                 $this->items[$index]['account_subtype_id'] = $item['account_subtype_id'];
             }
-        }
-
-        // Ensure all items have account codes and they are unique for each account subtype
-        // This will regenerate all codes to ensure uniqueness and proper sequencing
-        $this->ensureUniqueAccountCodes();
-        Log::debug('Items after ensureUniqueAccountCodes', [
-            'first_item' => $this->items[0] ?? null,
-        ]);
-
-        // Check for duplicate codes within the current batch
-        $batchCodes = [];
-        $duplicatesFound = [];
-        foreach ($this->items as $index => $item) {
-            $code = $item['account_code'] ?? '';
-            if ($code) {
-                if (isset($batchCodes[$code])) {
-                    $duplicatesFound[] = [
-                        'code' => $code,
-                        'first_index' => $batchCodes[$code],
-                        'first_item' => $this->items[$batchCodes[$code]]['account_name'],
-                        'duplicate_index' => $index,
-                        'duplicate_item' => $item['account_name'],
-                    ];
-                }
-                $batchCodes[$code] = $index;
-            }
-        }
-
-        if (!empty($duplicatesFound)) {
-            Log::error('Duplicate codes found in batch', ['duplicates' => $duplicatesFound]);
         }
 
         // Validate all items
@@ -960,24 +659,6 @@ class CreateCOAItems extends Component
             $rules["items.{$index}.account_subclass_id"] = 'required';
             $rules["items.{$index}.account_type_id"] = 'required';
             $rules["items.{$index}.account_subtype_id"] = 'required';
-            $rules["items.{$index}.account_code"] = [
-                'required',
-                'size:6',
-                function ($attribute, $value, $fail) {
-                    // Check if account code already exists in database
-                    // (This is a final safety check; ensureUniqueAccountCodes should prevent this)
-                    $existsQuery = COATemplateItem::where('account_code', $value);
-
-                    if (!empty($this->ignoreCoaItemIds)) {
-                        $existsQuery->whereNotIn('id', $this->ignoreCoaItemIds);
-                    }
-
-                    $exists = $existsQuery->exists();
-                    if ($exists) {
-                        $fail("The account code {$value} already exists in the database.");
-                    }
-                },
-            ];
             $rules["items.{$index}.normal_balance"] = 'required|in:debit,credit';
 
             // Human-readable attribute names for validation errors
@@ -986,7 +667,6 @@ class CreateCOAItems extends Component
             $attributeNames["items.{$index}.account_subclass_id"] = "Account Subclass (row {$rowNumber})";
             $attributeNames["items.{$index}.account_type_id"] = "Account Type (row {$rowNumber})";
             $attributeNames["items.{$index}.account_subtype_id"] = "Account Subtype (row {$rowNumber})";
-            $attributeNames["items.{$index}.account_code"] = "Account Code (row {$rowNumber})";
             $attributeNames["items.{$index}.normal_balance"] = "Normal Balance (row {$rowNumber})";
         }
 
@@ -998,7 +678,6 @@ class CreateCOAItems extends Component
             'items_summary' => array_map(function($item, $index) {
                 return [
                     'index' => $index,
-                    'account_code' => $item['account_code'] ?? 'N/A',
                     'account_name' => $item['account_name'] ?? 'N/A',
                     'account_subtype_id' => $item['account_subtype_id'] ?? 'N/A',
                 ];
@@ -1009,12 +688,10 @@ class CreateCOAItems extends Component
         foreach ($this->items as $index => $item) {
             Log::debug('Creating COA item', [
                 'index' => $index,
-                'account_code' => $item['account_code'],
                 'account_name' => $item['account_name'],
                 'account_subtype_id' => $item['account_subtype_id'],
             ]);
             $coaItem = COATemplateItem::create([
-                'account_code' => $item['account_code'],
                 'account_name' => $item['account_name'],
                 'account_subtype_id' => $item['account_subtype_id'],
                 'normal_balance' => $item['normal_balance'],

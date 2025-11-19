@@ -49,7 +49,6 @@ class EditCOAItem extends CreateCOAItems
 
         $this->items = [[
             'id' => $coaItem->id,
-            'account_code' => $coaItem->account_code,
             'account_name' => $coaItem->account_name,
             'account_class_id' => $accountClass->id,
             'account_class_name' => $accountClass->name,
@@ -93,7 +92,6 @@ class EditCOAItem extends CreateCOAItems
             $this->accountSubclasses[] = [
                 'id' => $accountSubclass->id,
                 'account_class_id' => $accountSubclass->account_class_id,
-                'code' => $accountSubclass->code,
                 'name' => $accountSubclass->name,
             ];
         }
@@ -102,7 +100,6 @@ class EditCOAItem extends CreateCOAItems
             $this->accountTypes[] = [
                 'id' => $accountType->id,
                 'account_subclass_id' => $accountType->account_subclass_id,
-                'code' => $accountType->code,
                 'name' => $accountType->name,
             ];
         }
@@ -111,11 +108,7 @@ class EditCOAItem extends CreateCOAItems
             $this->accountSubtypes[] = [
                 'id' => $accountSubtype->id,
                 'account_type_id' => $accountSubtype->account_type_id,
-                'code' => $accountSubtype->code,
                 'name' => $accountSubtype->name,
-                'class_code' => $accountSubtype->accountType->accountSubclass->accountClass->code,
-                'subclass_code' => $accountSubtype->accountType->accountSubclass->code,
-                'type_code' => $accountSubtype->accountType->code,
             ];
         }
     }
@@ -170,26 +163,12 @@ class EditCOAItem extends CreateCOAItems
             );
         }
 
-        $this->ensureUniqueAccountCodes();
-
         $rules = [
             'items.0.account_name' => 'required|max:200',
             'items.0.account_class_id' => 'required',
             'items.0.account_subclass_id' => 'required',
             'items.0.account_type_id' => 'required',
             'items.0.account_subtype_id' => 'required',
-            'items.0.account_code' => [
-                'required',
-                'size:6',
-                function ($attribute, $value, $fail) {
-                    $existsQuery = COATemplateItem::where('account_code', $value)
-                        ->whereNotIn('id', [$this->recordId]);
-
-                    if ($existsQuery->exists()) {
-                        $fail("The account code {$value} already exists in the database.");
-                    }
-                },
-            ],
             'items.0.normal_balance' => 'required|in:debit,credit',
         ];
 
@@ -199,13 +178,11 @@ class EditCOAItem extends CreateCOAItems
             'items.0.account_subclass_id' => 'Account Subclass',
             'items.0.account_type_id' => 'Account Type',
             'items.0.account_subtype_id' => 'Account Subtype',
-            'items.0.account_code' => 'Account Code',
             'items.0.normal_balance' => 'Normal Balance',
         ]);
 
         $coaItem = COATemplateItem::findOrFail($this->recordId);
         $coaItem->update([
-            'account_code' => $item['account_code'],
             'account_name' => $item['account_name'],
             'account_subtype_id' => $item['account_subtype_id'],
             'normal_balance' => $item['normal_balance'],

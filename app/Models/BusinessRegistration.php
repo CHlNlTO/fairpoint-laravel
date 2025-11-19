@@ -92,4 +92,9 @@ class BusinessRegistration extends Model
     {
         return $this->belongsTo(\Yajra\Address\Entities\Barangay::class, 'barangay_id');
     }
+
+    public function coaItems()
+    {
+        return $this->hasMany(BusinessCoaItem::class, 'business_id');
+    }
 }

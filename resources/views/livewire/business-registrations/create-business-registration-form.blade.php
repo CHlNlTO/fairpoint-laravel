@@ -19,13 +19,15 @@
     government_agency_ids: [],
     taxSelections: @js($taxSelections),
 
-    // COA Preview - preloaded for instant filtering
+    // COA Preview - loaded upfront for instant filtering
     coaPreview: [],
-    loadingCoaPreview: false,
+    selectedCoaItems: [],
     allCoaItems: @js($allCoaItems),
     coaItemsByBusinessType: @js($coaItemsByBusinessType),
     coaItemsByIndustryType: @js($coaItemsByIndustryType),
     coaItemsByTaxType: @js($coaItemsByTaxType),
+    coaStructure: @js($coaStructure),
+    coaItemsById: {},
 
     // Lookup data
     allRegions: @js($regions),
@@ -43,6 +45,27 @@
         // Pre-filter and cache all provinces, cities, and barangays by their parent IDs
         // This makes filtering instant when a selection is made
         this.cacheFilteredOptions();
+
+        // Initialize coaItemsById lookup map
+        this.coaItemsById = (this.allCoaItems || []).reduce((acc, item) => {
+            acc[String(item.id)] = item;
+            return acc;
+        }, {});
+
+        // Debug: Log first item to check data structure
+        if (this.allCoaItems && this.allCoaItems.length > 0) {
+            console.log('First COA Item sample:', {
+                id: this.allCoaItems[0].id,
+                account_name: this.allCoaItems[0].account_name,
+                account_class_name: this.allCoaItems[0].account_class_name,
+                account_subclass_name: this.allCoaItems[0].account_subclass_name,
+                account_type_name: this.allCoaItems[0].account_type_name,
+                account_subtype: this.allCoaItems[0].account_subtype,
+            });
+        }
+
+        // Initial filter
+        this.filterCoaItems();
 
         this.$watch('regionId', (newValue) => {
             this.provinceId = '';
@@ -66,32 +89,27 @@
         });
 
         // Watch for changes that affect COA preview
+        // Always filter when selections change, not just on step 7
         this.$watch('business_type_id', () => {
-            if (this.currentStep === 7) {
-                this.filterCoaItems();
-            }
+            this.filterCoaItems();
         });
 
         this.$watch('industry_type_ids', () => {
-            if (this.currentStep === 7) {
-                this.filterCoaItems();
-            }
+            this.filterCoaItems();
         });
 
         this.$watch('government_agency_ids', () => {
-            if (this.currentStep === 7) {
-                this.filterCoaItems();
-            }
+            this.filterCoaItems();
         });
 
         this.$watch('taxSelections', () => {
-            if (this.currentStep === 7 && this.isBirSelected()) {
-                this.filterCoaItems();
-            }
+            // Filter whenever tax selections change
+            this.filterCoaItems();
         }, { deep: true });
 
         this.$watch('currentStep', (newStep) => {
             if (newStep === 7) {
+                // COA data is already loaded - just filter it to reflect current state
                 this.filterCoaItems();
             }
         });
@@ -200,74 +218,181 @@
     },
 
     filterCoaItems() {
-        // Client-side filtering - instant results!
-        const itemIds = new Set();
+        if (!Array.isArray(this.allCoaItems) || this.allCoaItems.length === 0) {
+            this.coaPreview = [];
+            this.selectedCoaItems = [];
+            return;
+        }
 
-        // Get all default items
+        // Ensure coaItemsById is populated
+        if (Object.keys(this.coaItemsById).length === 0) {
+            this.coaItemsById = this.allCoaItems.reduce((acc, item) => {
+                // Normalize ID to string for consistent comparison
+                acc[String(item.id)] = item;
+                return acc;
+            }, {});
+        }
+
+        const selectedIds = new Set();
+
+        // Always include default items that are active
         this.allCoaItems.forEach(item => {
-            if (item.is_default) {
-                itemIds.add(item.id);
+            if (item.is_default && item.is_active) {
+                selectedIds.add(String(item.id));
             }
         });
 
         // Add items by business type
         if (this.business_type_id) {
-            const btItems = this.coaItemsByBusinessType[this.business_type_id] || [];
-            btItems.forEach(id => itemIds.add(id));
+            const businessTypeId = String(this.business_type_id);
+            const businessTypeItems = this.coaItemsByBusinessType[businessTypeId] || [];
+            businessTypeItems.forEach(id => {
+                selectedIds.add(String(id));
+            });
         }
 
         // Add items by industry types
-        this.industry_type_ids.forEach(industryId => {
-            const itItems = this.coaItemsByIndustryType[industryId] || [];
-            itItems.forEach(id => itemIds.add(id));
-        });
-
-        // Add items by tax types (collect all selected tax types)
-        const selectedTaxTypes = [];
-        Object.values(this.taxSelections).forEach(selection => {
-            if (Array.isArray(selection)) {
-                selectedTaxTypes.push(...selection);
-            } else if (selection) {
-                selectedTaxTypes.push(selection);
-            }
-        });
-
-        selectedTaxTypes.forEach(taxId => {
-            const ttItems = this.coaItemsByTaxType[taxId] || [];
-            ttItems.forEach(id => itemIds.add(id));
-        });
-
-        // Filter items by IDs
-        this.coaPreview = this.allCoaItems.filter(item => itemIds.has(item.id));
-    },
-
-    async submitForm() {
-        // Batch sync all form data to Livewire in one go
-        const formData = {
-            business_name: this.business_name,
-            tin_number: this.tin_number,
-            business_email: this.business_email,
-            region_id: this.regionId,
-            province_id: this.provinceId,
-            city_id: this.cityId,
-            barangay_id: this.barangayId,
-            street_address: this.street_address,
-            building_name: this.building_name,
-            unit_number: this.unit_number,
-            postal_code: this.postal_code,
-            industry_type_ids: this.industry_type_ids,
-            fiscal_year_period_id: this.fiscal_year_period_id,
-            business_type_id: this.business_type_id,
-            government_agency_ids: this.government_agency_ids,
-            taxSelections: this.taxSelections
-        };
-
-        // Sync all at once
-        for (const [key, value] of Object.entries(formData)) {
-            $wire.set(key, value, false);
+        if (Array.isArray(this.industry_type_ids) && this.industry_type_ids.length > 0) {
+            this.industry_type_ids.forEach(industryId => {
+                const industryTypeId = String(industryId);
+                const industryTypeItems = this.coaItemsByIndustryType[industryTypeId] || [];
+                industryTypeItems.forEach(id => {
+                    selectedIds.add(String(id));
+                });
+            });
         }
 
-        // Then submit
+        // Add items by tax types (whenever tax types are selected)
+        const selectedTaxTypeIds = this.collectSelectedTaxTypeIds();
+        if (selectedTaxTypeIds.length > 0) {
+            selectedTaxTypeIds.forEach(taxId => {
+                const taxTypeId = String(taxId);
+                const taxTypeItems = this.coaItemsByTaxType[taxTypeId] || [];
+                taxTypeItems.forEach(id => {
+                    selectedIds.add(String(id));
+                });
+            });
+        }
+
+        // Filter and enrich items
+        const enrichedItems = Array.from(selectedIds)
+            .map(id => this.coaItemsById[String(id)])
+            .filter(item => item && item.is_active)
+            .map(item => {
+                const accountCode = this.generateAccountCode(item);
+                return {
+                    ...item,
+                    account_code: accountCode,
+                    normal_balance_label: this.formatBalance(item.normal_balance),
+                    // Ensure all hierarchy names are properly set
+                    account_class_name: item.account_class_name || 'N/A',
+                    account_subclass_name: item.account_subclass_name || 'N/A',
+                    account_type_name: item.account_type_name || 'N/A',
+                    account_subtype: item.account_subtype || item.account_subtype_name || 'N/A',
+                };
+            })
+            .sort((a, b) => a.account_code.localeCompare(b.account_code));
+
+        // Debug logging (can be removed in production)
+        if (this.currentStep === 7) {
+            const selectedTaxTypeIds = this.collectSelectedTaxTypeIds();
+            const taxTypeItemsCount = selectedTaxTypeIds.reduce((count, taxId) => {
+                const taxTypeId = String(taxId);
+                const items = this.coaItemsByTaxType[taxTypeId] || [];
+                return count + items.length;
+            }, 0);
+
+            console.log('COA Filtering Debug:', {
+                totalItems: this.allCoaItems.length,
+                selectedIdsCount: selectedIds.size,
+                businessTypeId: this.business_type_id,
+                industryTypeIds: this.industry_type_ids,
+                isBirSelected: this.isBirSelected(),
+                taxTypeIds: selectedTaxTypeIds,
+                taxTypeItemsCount: taxTypeItemsCount,
+                coaItemsByTaxTypeKeys: Object.keys(this.coaItemsByTaxType || {}),
+                enrichedItemsCount: enrichedItems.length,
+            });
+        }
+
+        this.coaPreview = enrichedItems.map(item => ({
+            account_code: item.account_code,
+            account_name: item.account_name,
+            account_class_name: item.account_class_name ?? 'N/A',
+            account_subclass_name: item.account_subclass_name ?? 'N/A',
+            account_type_name: item.account_type_name ?? 'N/A',
+            account_subtype: item.account_subtype ?? 'N/A',
+            normal_balance: item.normal_balance_label,
+        }));
+
+        this.selectedCoaItems = enrichedItems.map(item => ({
+            coa_item_id: item.id,
+            account_code: item.account_code,
+            normal_balance: item.normal_balance,
+            is_active: item.is_active,
+        }));
+    },
+
+    collectSelectedTaxTypeIds() {
+        const ids = [];
+        // Iterate over taxSelections object keys to handle both array and single values
+        Object.keys(this.taxSelections || {}).forEach(categoryId => {
+            const selection = this.taxSelections[categoryId];
+            if (Array.isArray(selection)) {
+                selection.filter(Boolean).forEach(id => ids.push(String(id)));
+            } else if (selection) {
+                ids.push(String(selection));
+            }
+        });
+        return Array.from(new Set(ids));
+    },
+
+    generateAccountCode(item) {
+        const classCodes = this.coaStructure.classCodes || {};
+        const subclassOrders = this.coaStructure.subclassOrders || {};
+        const typeOrders = this.coaStructure.typeOrders || {};
+        const subtypeOrders = this.coaStructure.subtypeOrders || {};
+
+        const classDigit = this.padNumber(classCodes[item.account_class_id] ?? 0, 1);
+        const subclassDigit = this.padNumber(subclassOrders[item.account_subclass_id] ?? 1, 1);
+        const typeDigits = this.padNumber(typeOrders[item.account_type_id] ?? 1, 2);
+        const subtypeDigits = this.padNumber(subtypeOrders[item.account_subtype_id] ?? 0, 2);
+        return `${classDigit}${subclassDigit}${typeDigits}${subtypeDigits}`;
+    },
+
+    padNumber(value, size) {
+        const numericValue = parseInt(value, 10);
+        const safeValue = Number.isNaN(numericValue) ? 0 : numericValue;
+        return String(safeValue).padStart(size, '0');
+    },
+
+    formatBalance(value) {
+        const normalized = (value || 'debit').toLowerCase();
+        return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    },
+
+    submitForm() {
+        // OPTIMIZED: Batch all updates without await (no server round trips until submit)
+        // This makes the submission instant instead of taking several minutes
+        $wire.$set('business_name', this.business_name, false);
+        $wire.$set('tin_number', this.tin_number, false);
+        $wire.$set('business_email', this.business_email, false);
+        $wire.$set('region_id', this.regionId, false);
+        $wire.$set('province_id', this.provinceId, false);
+        $wire.$set('city_id', this.cityId, false);
+        $wire.$set('barangay_id', this.barangayId, false);
+        $wire.$set('street_address', this.street_address, false);
+        $wire.$set('building_name', this.building_name, false);
+        $wire.$set('unit_number', this.unit_number, false);
+        $wire.$set('postal_code', this.postal_code, false);
+        $wire.$set('industry_type_ids', this.industry_type_ids, false);
+        $wire.$set('fiscal_year_period_id', this.fiscal_year_period_id, false);
+        $wire.$set('business_type_id', this.business_type_id, false);
+        $wire.$set('government_agency_ids', this.government_agency_ids, false);
+        $wire.$set('taxSelections', this.taxSelections, false);
+        $wire.$set('selectedCoaItems', this.selectedCoaItems, false);
+
+        // Submit once with all batched changes
         $wire.submit();
     }
 }">
@@ -657,9 +782,7 @@
                     </p>
                 </div>
 
-                <div class="rounded-xl border border-primary-200 dark:border-primary-500/60 bg-primary-50 dark:bg-primary-500/10 p-4 space-y-4">
-                        <h3 class="text-sm font-semibold text-primary-700 dark:text-primary-300">BIR Tax Configuration</h3>
-                        <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                             @foreach ($taxCategories as $categoryId => $meta)
                                 <div class="space-y-3">
                                     <div class="flex items-center justify-between">
@@ -677,7 +800,7 @@
                                                 <label class="flex items-center gap-3 rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                                     <input type="checkbox"
                                                            value="{{ $taxTypeId }}"
-                                                           x-model="taxSelections.{{ $categoryId }}"
+                                                           x-model="taxSelections['{{ $categoryId }}']"
                                                            class="fi-checkbox-input rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:checked:border-primary-600 dark:checked:bg-primary-600">
                                                     <span class="text-sm text-gray-900 dark:text-gray-100">{{ $taxTypeName }}</span>
                                                 </label>
@@ -686,7 +809,7 @@
                                     @else
                                         <div class="fi-input-wrp fi-fo-select">
                                             <div class="fi-input-wrp-content-ctn">
-                                                <select x-model="taxSelections.{{ $categoryId }}"
+                                                <select x-model="taxSelections['{{ $categoryId }}']"
                                                         class="fi-select-input fi-input">
                                                     <option value="">Select tax type</option>
                                                     @foreach ($meta['tax_types'] as $taxTypeId => $taxTypeName)
@@ -699,7 +822,6 @@
                                 </div>
                             @endforeach
                         </div>
-                </div>
             </div>
         </div>
 
@@ -712,11 +834,16 @@
                     <p class="text-sm text-gray-500 dark:text-gray-400">Based on your selections, these accounts will be connected to the business registration.</p>
 
                     <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" x-show="coaPreview.length > 0">
+                        <!-- Table -->
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" x-show="coaPreview.length > 0">
                                 <thead class="bg-gray-50 dark:bg-gray-800/60">
                                     <tr>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Account Code</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Account Name</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Class</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Subclass</th>
+                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Type</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Subtype</th>
                                         <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Normal Balance</th>
                                     </tr>
@@ -726,12 +853,18 @@
                                         <tr>
                                             <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100" x-text="item.account_code"></td>
                                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_name"></td>
+                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_class_name"></td>
+                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_subclass_name"></td>
+                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_type_name"></td>
                                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_subtype"></td>
                                             <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.normal_balance"></td>
                                         </tr>
                                     </template>
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Empty State -->
                         <p x-show="coaPreview.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
                             No accounts to display yet. Select business type, industries, or government agencies to see accounts.
                         </p>

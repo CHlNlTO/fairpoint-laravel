@@ -20,7 +20,6 @@ class COATemplateItem extends Model
     protected $keyType = 'string';
 
     protected $fillable = [
-        'account_code',
         'account_name',
         'account_subtype_id',
         'is_active',

@@ -25,13 +25,11 @@ class AccountType extends Model
         'is_system_defined',
         'description',
         'hint',
-        'code',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'is_system_defined' => 'boolean',
-        'code' => 'integer',
     ];
 
     public function accountSubclass() { return $this->belongsTo(AccountSubclass::class); }
