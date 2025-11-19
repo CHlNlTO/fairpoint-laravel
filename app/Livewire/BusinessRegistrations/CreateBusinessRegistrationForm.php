@@ -284,6 +284,10 @@ class CreateBusinessRegistrationForm extends Component
                                 'business_id' => $businessId,
                                 'coa_item_id' => $item['coa_item_id'],
                                 'account_code' => $item['account_code'],
+                                'account_class' => $item['account_class'] ?? 'N/A',
+                                'account_subclass' => $item['account_subclass'] ?? 'N/A',
+                                'account_type' => $item['account_type'] ?? 'N/A',
+                                'account_subtype' => $item['account_subtype'] ?? 'N/A',
                                 'normal_balance' => $normalBalance,
                                 'is_active' => (bool) ($item['is_active'] ?? true),
                                 'created_at' => $now,
@@ -656,7 +660,7 @@ class CreateBusinessRegistrationForm extends Component
                 ->leftJoin('account_subclasses as asc', 'aty.account_subclass_id', '=', 'asc.id')
                 ->leftJoin('account_classes as acl', 'asc.account_class_id', '=', 'acl.id')
                 ->where('cti.is_active', true)
-                ->orderBy('cti.account_name')
+                ->orderBy('cti.id', 'asc')
                 ->get()
                 ->map(function ($item) {
                     // Debug: Log first few items to check data

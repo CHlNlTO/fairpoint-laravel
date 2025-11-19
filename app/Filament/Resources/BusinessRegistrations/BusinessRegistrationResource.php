@@ -6,6 +6,7 @@ use App\Filament\Resources\BusinessRegistrations\Pages\CreateBusinessRegistratio
 use App\Filament\Resources\BusinessRegistrations\Pages\EditBusinessRegistration;
 use App\Filament\Resources\BusinessRegistrations\Pages\ListBusinessRegistrations;
 use App\Filament\Resources\BusinessRegistrations\Pages\ViewBusinessRegistration;
+use App\Filament\Resources\BusinessRegistrations\RelationManagers\BusinessCoaItemsRelationManager;
 use App\Filament\Resources\BusinessRegistrations\Schemas\BusinessRegistrationForm;
 use App\Filament\Resources\BusinessRegistrations\Tables\BusinessRegistrationsTable;
 use App\Models\BusinessRegistration;
@@ -42,6 +43,13 @@ class BusinessRegistrationResource extends Resource
             'create' => CreateBusinessRegistration::route('/create'),
             'edit' => EditBusinessRegistration::route('/{record}/edit'),
             'view' => ViewBusinessRegistration::route('/{record}'),
+        ];
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            BusinessCoaItemsRelationManager::class,
         ];
     }
 }

@@ -328,6 +328,10 @@
         this.selectedCoaItems = enrichedItems.map(item => ({
             coa_item_id: item.id,
             account_code: item.account_code,
+            account_class: item.account_class_name ?? 'N/A',
+            account_subclass: item.account_subclass_name ?? 'N/A',
+            account_type: item.account_type_name ?? 'N/A',
+            account_subtype: item.account_subtype ?? 'N/A',
             normal_balance: item.normal_balance,
             is_active: item.is_active,
         }));

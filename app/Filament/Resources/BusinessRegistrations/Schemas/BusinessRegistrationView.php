@@ -25,13 +25,34 @@ class BusinessRegistrationView
                             ->icon('heroicon-m-envelope'),
                         TextEntry::make('fiscalYearPeriod.name')
                             ->label('Fiscal Year Period'),
-                        TextEntry::make('businessType.name')
-                            ->label('Business Type'),
                         IconEntry::make('is_active')
                             ->label('Active')
                             ->boolean(),
                     ])
                     ->columns(2),
+
+                Section::make('Business Classification')
+                    ->schema([
+                        TextEntry::make('businessType.name')
+                            ->label('Business Type')
+                            ->badge()
+                            ->color('primary'),
+                        TextEntry::make('industryTypes.name')
+                            ->label('Industry Types')
+                            ->badge()
+                            ->separator(',')
+                            ->placeholder('No industry types selected')
+                            ->color('success'),
+                        TextEntry::make('taxTypes.name')
+                            ->label('Tax Types')
+                            ->badge()
+                            ->separator(',')
+                            ->placeholder('No tax types selected')
+                            ->color('warning')
+                            ->visible(fn ($record) => $record->taxTypes->isNotEmpty()),
+                    ])
+                    ->columns(1)
+                    ->compact(),
 
                 Section::make('Address Information')
                     ->schema([
@@ -55,50 +76,20 @@ class BusinessRegistrationView
                     ])
                     ->columns(2),
 
-                Section::make('Industry Types')
+                Section::make('Government Agencies')
                     ->schema([
-                        TextEntry::make('industryTypes.name')
-                            ->label('Industry Types')
-                            ->badge()
-                            ->separator(',')
-                            ->placeholder('No industry types selected'),
-                    ]),
-
-                Section::make('Tax Types')
-                    ->schema([
-                        TextEntry::make('taxTypes.name')
-                            ->label('Tax Types')
-                            ->badge()
-                            ->separator(',')
-                            ->placeholder('No tax types selected'),
+                        TextEntry::make('governmentRegistrations')
+                            ->label('Agencies')
+                            ->getStateUsing(function ($record) {
+                                $agencies = $record->governmentRegistrations;
+                                if ($agencies->isEmpty()) {
+                                    return 'No government agencies registered';
+                                }
+                                return $agencies->pluck('governmentAgency.name')->filter()->join(', ');
+                            })
+                            ->placeholder('No government agencies registered'),
                     ])
-                    ->visible(fn ($record) => $record->taxTypes->isNotEmpty()),
-
-                Section::make('Government Registrations')
-                    ->schema([
-                        RepeatableEntry::make('governmentRegistrations')
-                            ->label('Government Agencies')
-                            ->schema([
-                                TextEntry::make('governmentAgency.name')
-                                    ->label('Agency'),
-                                TextEntry::make('registration_number')
-                                    ->label('Registration Number')
-                                    ->placeholder('Not provided'),
-                                TextEntry::make('registration_date')
-                                    ->label('Registration Date')
-                                    ->date()
-                                    ->placeholder('Not provided'),
-                                TextEntry::make('expiry_date')
-                                    ->label('Expiry Date')
-                                    ->date()
-                                    ->placeholder('Not provided'),
-                                TextEntry::make('status')
-                                    ->label('Status')
-                                    ->placeholder('Not provided'),
-                            ])
-                            ->columns(2)
-                            ->placeholder('No government registrations'),
-                    ]),
+                    ->compact(),
 
                 Section::make('Additional Information')
                     ->schema([
