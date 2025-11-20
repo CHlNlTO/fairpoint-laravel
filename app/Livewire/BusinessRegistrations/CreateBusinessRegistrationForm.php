@@ -610,30 +610,54 @@ class CreateBusinessRegistrationForm extends Component
                 ->mapWithKeys(fn ($class) => [(string) $class->id => str_pad((string) $class->code, 1, '0', STR_PAD_LEFT)])
                 ->toArray();
 
+            // Subclass orders: Sort by sort_order (ascending), then assign sequential numbers starting from 1
             $subclassOrders = AccountSubclass::where('is_active', true)
                 ->orderBy('account_class_id')
-                ->orderBy('name')
-                ->get(['id', 'account_class_id'])
+                ->orderBy('sort_order') // Sort by sort_order first
+                ->orderBy('name') // Then by name as secondary sort
+                ->get(['id', 'account_class_id', 'sort_order', 'name'])
                 ->groupBy('account_class_id')
-                ->map(fn ($group) => $group->values())
+                ->map(function ($group) {
+                    // Sort each group by sort_order (ascending) first, then by name if sort_orders are equal
+                    return $group->sortBy(function ($item) {
+                        // Primary sort: sort_order (ascending), secondary: name (ascending)
+                        return [$item->sort_order ?? 1, $item->name ?? ''];
+                    })->values();
+                })
                 ->flatMap(fn ($group) => $group->mapWithKeys(fn ($subclass, $index) => [(string) $subclass->id => $index + 1]))
                 ->toArray();
 
+            // Type orders: Sort by sort_order (ascending), then assign sequential numbers starting from 1
             $typeOrders = AccountType::where('is_active', true)
                 ->orderBy('account_subclass_id')
-                ->orderBy('name')
-                ->get(['id', 'account_subclass_id'])
+                ->orderBy('sort_order') // Sort by sort_order first
+                ->orderBy('name') // Then by name as secondary sort
+                ->get(['id', 'account_subclass_id', 'sort_order', 'name'])
                 ->groupBy('account_subclass_id')
-                ->map(fn ($group) => $group->values())
+                ->map(function ($group) {
+                    // Sort each group by sort_order (ascending) first, then by name if sort_orders are equal
+                    return $group->sortBy(function ($item) {
+                        // Primary sort: sort_order (ascending), secondary: name (ascending)
+                        return [$item->sort_order ?? 1, $item->name ?? ''];
+                    })->values();
+                })
                 ->flatMap(fn ($group) => $group->mapWithKeys(fn ($type, $index) => [(string) $type->id => $index + 1]))
                 ->toArray();
 
+            // Subtype orders: Sort by sort_order (ascending), then assign sequential numbers starting from 0
             $subtypeOrders = AccountSubtype::where('is_active', true)
                 ->orderBy('account_type_id')
-                ->orderBy('name')
-                ->get(['id', 'account_type_id'])
+                ->orderBy('sort_order') // Sort by sort_order first
+                ->orderBy('name') // Then by name as secondary sort
+                ->get(['id', 'account_type_id', 'sort_order', 'name'])
                 ->groupBy('account_type_id')
-                ->map(fn ($group) => $group->values())
+                ->map(function ($group) {
+                    // Sort each group by sort_order (ascending) first, then by name if sort_orders are equal
+                    return $group->sortBy(function ($item) {
+                        // Primary sort: sort_order (ascending), secondary: name (ascending)
+                        return [$item->sort_order ?? 0, $item->name ?? ''];
+                    })->values();
+                })
                 ->flatMap(fn ($group) => $group->mapWithKeys(fn ($subtype, $index) => [(string) $subtype->id => $index]))
                 ->toArray();
 
