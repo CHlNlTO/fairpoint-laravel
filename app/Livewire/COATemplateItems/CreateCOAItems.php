@@ -64,6 +64,7 @@ class CreateCOAItems extends Component
                     'id' => $subclass->id,
                     'account_class_id' => $subclass->account_class_id,
                     'name' => $subclass->name,
+                    'sort_order' => $subclass->sort_order ?? 1,
                 ];
             })
             ->toArray();
@@ -76,6 +77,7 @@ class CreateCOAItems extends Component
                     'id' => $type->id,
                     'account_subclass_id' => $type->account_subclass_id,
                     'name' => $type->name,
+                    'sort_order' => $type->sort_order ?? 1,
                 ];
             })
             ->toArray();
@@ -88,6 +90,7 @@ class CreateCOAItems extends Component
                     'id' => $subtype->id,
                     'account_type_id' => $subtype->account_type_id,
                     'name' => $subtype->name,
+                    'sort_order' => $subtype->sort_order ?? 0,
                 ];
             })
             ->toArray();
@@ -132,8 +135,11 @@ class CreateCOAItems extends Component
         $headers = [
             'Account Name',
             'Account Class',
+            'Account Subclass Sort Order',
             'Account Subclass',
+            'Account Type Sort Order',
             'Account Type',
+            'Account Subtype Sort Order',
             'Account Subtype',
             'Normal Balance',
             'Tax Type',
@@ -155,8 +161,11 @@ class CreateCOAItems extends Component
         fputcsv($file, [
             'Petty Cash Fund',
             'Assets',
+            '1',
             'Current Assets',
+            '1',
             'Cash and Cash Equivalents',
+            '0',
             'Petty Cash Fund',
             'Debit',
             'Any',
@@ -197,8 +206,11 @@ class CreateCOAItems extends Component
         $expectedHeaders = [
             'Account Name',
             'Account Class',
+            'Account Subclass Sort Order',
             'Account Subclass',
+            'Account Type Sort Order',
             'Account Type',
+            'Account Subtype Sort Order',
             'Account Subtype',
             'Normal Balance',
             'Tax Type',
@@ -224,28 +236,32 @@ class CreateCOAItems extends Component
                 continue;
             }
 
-            if (count($row) !== 10) {
+            if (count($row) !== 13) {
                 continue; // Skip invalid rows
             }
 
             // Map CSV row to item structure
+            // Column indices: 0=Name, 1=Class, 2=Subclass Sort, 3=Subclass, 4=Type Sort, 5=Type, 6=Subtype Sort, 7=Subtype, 8=Balance, 9=Tax, 10=Industry, 11=Business, 12=Default
             $item = [
                 'account_name' => trim($row[0]) ?: '',
                 'account_class_name' => trim($row[1]) ?: '', // Store name for matching
-                'account_subclass_name' => trim($row[2]) ?: '',
-                'account_type_name' => trim($row[3]) ?: '',
-                'account_subtype_name' => trim($row[4]) ?: '',
-                'normal_balance' => strtolower(trim($row[5])) === 'credit' ? 'credit' : 'debit',
-                'tax_type_name' => trim($row[6]) ?: '',
-                'industry_type_name' => trim($row[7]) ?: '',
-                'business_type_name' => trim($row[8]) ?: '',
+                'account_subclass_sort_order' => !empty(trim($row[2])) ? (int)trim($row[2]) : 1,
+                'account_subclass_name' => trim($row[3]) ?: '',
+                'account_type_sort_order' => !empty(trim($row[4])) ? (int)trim($row[4]) : 1,
+                'account_type_name' => trim($row[5]) ?: '',
+                'account_subtype_sort_order' => !empty(trim($row[6])) ? (int)trim($row[6]) : 0,
+                'account_subtype_name' => trim($row[7]) ?: '',
+                'normal_balance' => strtolower(trim($row[8])) === 'credit' ? 'credit' : 'debit',
+                'tax_type_name' => trim($row[9]) ?: '',
+                'industry_type_name' => trim($row[10]) ?: '',
+                'business_type_name' => trim($row[11]) ?: '',
                 // Initialize IDs (will be set during matching)
                 'account_class_id' => '',
                 'account_subclass_id' => '',
                 'account_type_id' => '',
                 'account_subtype_id' => '',
                 'is_active' => true,
-                'is_default' => strtolower(trim($row[9])) === 'yes',
+                'is_default' => strtolower(trim($row[12])) === 'yes',
                 'business_type_ids' => [],
                 'industry_type_ids' => [],
                 'tax_type_ids' => [],
@@ -463,13 +479,19 @@ class CreateCOAItems extends Component
         return $accountClass->id;
     }
 
-    protected function createOrGetAccountSubclass($name, $accountClassId)
+    protected function createOrGetAccountSubclass($name, $accountClassId, $sortOrder = 1)
     {
         // Check if already exists in loaded data
         $existing = collect($this->accountSubclasses)->first(function ($subclass) use ($name, $accountClassId) {
             return $subclass['name'] === $name && $subclass['account_class_id'] === $accountClassId;
         });
         if ($existing) {
+            // Update sort_order if provided and different
+            $existingSortOrder = $existing['sort_order'] ?? 1;
+            if ($sortOrder && $sortOrder !== $existingSortOrder) {
+                AccountSubclass::where('id', $existing['id'])->update(['sort_order' => $sortOrder]);
+                $existing['sort_order'] = $sortOrder;
+            }
             return $existing['id'];
         }
 
@@ -478,11 +500,16 @@ class CreateCOAItems extends Component
             ->where('account_class_id', $accountClassId)
             ->first();
         if ($accountSubclass) {
+            // Update sort_order if provided and different
+            if ($sortOrder && $accountSubclass->sort_order !== $sortOrder) {
+                $accountSubclass->update(['sort_order' => $sortOrder]);
+            }
             // Add to loaded data
             $this->accountSubclasses[] = [
                 'id' => $accountSubclass->id,
                 'account_class_id' => $accountSubclass->account_class_id,
                 'name' => $accountSubclass->name,
+                'sort_order' => $accountSubclass->sort_order ?? 1,
             ];
             return $accountSubclass->id;
         }
@@ -491,6 +518,7 @@ class CreateCOAItems extends Component
         $accountSubclass = AccountSubclass::create([
             'account_class_id' => $accountClassId,
             'name' => $name,
+            'sort_order' => $sortOrder ?? 1,
             'is_active' => true,
         ]);
 
@@ -499,18 +527,25 @@ class CreateCOAItems extends Component
             'id' => $accountSubclass->id,
             'account_class_id' => $accountSubclass->account_class_id,
             'name' => $accountSubclass->name,
+            'sort_order' => $accountSubclass->sort_order ?? 1,
         ];
 
         return $accountSubclass->id;
     }
 
-    protected function createOrGetAccountType($name, $accountSubclassId)
+    protected function createOrGetAccountType($name, $accountSubclassId, $sortOrder = 1)
     {
         // Check if already exists in loaded data
         $existing = collect($this->accountTypes)->first(function ($type) use ($name, $accountSubclassId) {
             return $type['name'] === $name && $type['account_subclass_id'] === $accountSubclassId;
         });
         if ($existing) {
+            // Update sort_order if provided and different
+            $existingSortOrder = $existing['sort_order'] ?? 1;
+            if ($sortOrder && $sortOrder !== $existingSortOrder) {
+                AccountType::where('id', $existing['id'])->update(['sort_order' => $sortOrder]);
+                $existing['sort_order'] = $sortOrder;
+            }
             return $existing['id'];
         }
 
@@ -519,11 +554,16 @@ class CreateCOAItems extends Component
             ->where('account_subclass_id', $accountSubclassId)
             ->first();
         if ($accountType) {
+            // Update sort_order if provided and different
+            if ($sortOrder && $accountType->sort_order !== $sortOrder) {
+                $accountType->update(['sort_order' => $sortOrder]);
+            }
             // Add to loaded data
             $this->accountTypes[] = [
                 'id' => $accountType->id,
                 'account_subclass_id' => $accountType->account_subclass_id,
                 'name' => $accountType->name,
+                'sort_order' => $accountType->sort_order ?? 1,
             ];
             return $accountType->id;
         }
@@ -532,6 +572,7 @@ class CreateCOAItems extends Component
         $accountType = AccountType::create([
             'account_subclass_id' => $accountSubclassId,
             'name' => $name,
+            'sort_order' => $sortOrder ?? 1,
             'is_active' => true,
             'is_system_defined' => true,
         ]);
@@ -541,18 +582,25 @@ class CreateCOAItems extends Component
             'id' => $accountType->id,
             'account_subclass_id' => $accountType->account_subclass_id,
             'name' => $accountType->name,
+            'sort_order' => $accountType->sort_order ?? 1,
         ];
 
         return $accountType->id;
     }
 
-    protected function createOrGetAccountSubtype($name, $accountTypeId)
+    protected function createOrGetAccountSubtype($name, $accountTypeId, $sortOrder = 0)
     {
         // Check if already exists in loaded data
         $existing = collect($this->accountSubtypes)->first(function ($subtype) use ($name, $accountTypeId) {
             return $subtype['name'] === $name && $subtype['account_type_id'] === $accountTypeId;
         });
         if ($existing) {
+            // Update sort_order if provided and different
+            $existingSortOrder = $existing['sort_order'] ?? 0;
+            if ($sortOrder !== null && $sortOrder !== $existingSortOrder) {
+                AccountSubtype::where('id', $existing['id'])->update(['sort_order' => $sortOrder]);
+                $existing['sort_order'] = $sortOrder;
+            }
             return $existing['id'];
         }
 
@@ -561,11 +609,16 @@ class CreateCOAItems extends Component
             ->where('account_type_id', $accountTypeId)
             ->first();
         if ($accountSubtype) {
+            // Update sort_order if provided and different
+            if ($sortOrder !== null && $accountSubtype->sort_order !== $sortOrder) {
+                $accountSubtype->update(['sort_order' => $sortOrder]);
+            }
             // Add to loaded data
             $this->accountSubtypes[] = [
                 'id' => $accountSubtype->id,
                 'account_type_id' => $accountSubtype->account_type_id,
                 'name' => $accountSubtype->name,
+                'sort_order' => $accountSubtype->sort_order ?? 0,
             ];
             return $accountSubtype->id;
         }
@@ -574,6 +627,7 @@ class CreateCOAItems extends Component
         $accountSubtype = AccountSubtype::create([
             'account_type_id' => $accountTypeId,
             'name' => $name,
+            'sort_order' => $sortOrder ?? 0,
             'is_active' => true,
             'is_system_defined' => true,
         ]);
@@ -583,6 +637,7 @@ class CreateCOAItems extends Component
             'id' => $accountSubtype->id,
             'account_type_id' => $accountSubtype->account_type_id,
             'name' => $accountSubtype->name,
+            'sort_order' => $accountSubtype->sort_order ?? 0,
         ];
 
         return $accountSubtype->id;
@@ -617,7 +672,8 @@ class CreateCOAItems extends Component
                 (empty($item['account_subclass_id']) || ($item['needs_subclass_creation'] ?? false))) {
                 $this->items[$index]['account_subclass_id'] = $this->createOrGetAccountSubclass(
                     $item['account_subclass_name'],
-                    $this->items[$index]['account_class_id']
+                    $this->items[$index]['account_class_id'],
+                    $item['account_subclass_sort_order'] ?? 1
                 );
             }
 
@@ -627,7 +683,8 @@ class CreateCOAItems extends Component
                 (empty($item['account_type_id']) || ($item['needs_type_creation'] ?? false))) {
                 $this->items[$index]['account_type_id'] = $this->createOrGetAccountType(
                     $item['account_type_name'],
-                    $this->items[$index]['account_subclass_id']
+                    $this->items[$index]['account_subclass_id'],
+                    $item['account_type_sort_order'] ?? 1
                 );
             }
 
@@ -637,7 +694,8 @@ class CreateCOAItems extends Component
                 (empty($item['account_subtype_id']) || ($item['needs_subtype_creation'] ?? false))) {
                 $subtypeId = $this->createOrGetAccountSubtype(
                     $item['account_subtype_name'],
-                    $this->items[$index]['account_type_id']
+                    $this->items[$index]['account_type_id'],
+                    $item['account_subtype_sort_order'] ?? 0
                 );
                 $this->items[$index]['account_subtype_id'] = $subtypeId;
             }

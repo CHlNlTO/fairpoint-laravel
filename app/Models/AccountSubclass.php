@@ -19,6 +19,7 @@ class AccountSubclass extends Model
     protected $fillable = [
         'account_class_id',
         'name',
+        'sort_order',
         'is_active',
         'description',
         'hint',

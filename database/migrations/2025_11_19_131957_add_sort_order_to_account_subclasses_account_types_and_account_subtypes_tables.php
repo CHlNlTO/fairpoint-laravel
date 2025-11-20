@@ -14,17 +14,17 @@ return new class extends Migration
     {
         // Add sortOrder to account_subclasses
         Schema::table('account_subclasses', function (Blueprint $table) {
-            $table->unsignedInteger('sort_order')->default(0)->after('name');
+            $table->unsignedInteger('sort_order')->default(1)->after('name');
         });
 
-        DB::statement('ALTER TABLE account_subclasses ADD CONSTRAINT account_subclasses_sort_order_check CHECK (sort_order >= 0)');
+        DB::statement('ALTER TABLE account_subclasses ADD CONSTRAINT account_subclasses_sort_order_check CHECK (sort_order >= 1)');
 
         // Add sortOrder to account_types
         Schema::table('account_types', function (Blueprint $table) {
-            $table->unsignedInteger('sort_order')->default(0)->after('name');
+            $table->unsignedInteger('sort_order')->default(1)->after('name');
         });
 
-        DB::statement('ALTER TABLE account_types ADD CONSTRAINT account_types_sort_order_check CHECK (sort_order >= 0)');
+        DB::statement('ALTER TABLE account_types ADD CONSTRAINT account_types_sort_order_check CHECK (sort_order >= 1)');
 
         // Add sortOrder to account_subtypes
         Schema::table('account_subtypes', function (Blueprint $table) {

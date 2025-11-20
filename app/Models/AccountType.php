@@ -21,6 +21,7 @@ class AccountType extends Model
         'user_id',
         'business_registration_id',
         'name',
+        'sort_order',
         'is_active',
         'is_system_defined',
         'description',

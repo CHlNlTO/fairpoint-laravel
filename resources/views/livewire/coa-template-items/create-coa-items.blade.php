@@ -71,6 +71,10 @@
                 this.item.account_type_name = '';
                 this.item.account_subtype_id = '';
                 this.item.account_subtype_name = '';
+                // Reset sort orders when class changes
+                this.item.account_subclass_sort_order = 1;
+                this.item.account_type_sort_order = 1;
+                this.item.account_subtype_sort_order = 0;
                 this.open = false;
             }
         };
@@ -80,10 +84,13 @@
             account_name: '',
             account_class_id: '',
             account_class_name: '',
+            account_subclass_sort_order: 1,
             account_subclass_id: '',
             account_subclass_name: '',
+            account_type_sort_order: 1,
             account_type_id: '',
             account_type_name: '',
+            account_subtype_sort_order: 0,
             account_subtype_id: '',
             account_subtype_name: '',
             normal_balance: 'debit',
@@ -240,8 +247,11 @@
                 <tr>
                     <th>Account Name<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
                     <th>Account Class<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
+                    <th>Subclass Sort</th>
                     <th>Account Subclass<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
+                    <th>Type Sort</th>
                     <th>Account Type<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
+                    <th>Subtype Sort</th>
                     <th>Account Subtype<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
                     <th>Normal Balance<sup class="fi-fo-table-repeater-header-required-mark">*</sup></th>
                     <th>Business Type</th>
@@ -305,6 +315,19 @@
                             </div>
                         </td>
 
+                        <!-- Account Subclass Sort Order -->
+                        <td class="min-w-24">
+                            <div class="fi-input-wrp fi-fo-text-input">
+                                <div class="fi-input-wrp-content-ctn">
+                                    <input type="number"
+                                           x-model="item.account_subclass_sort_order"
+                                           min="1"
+                                           class="fi-input"
+                                           placeholder="1">
+                                </div>
+                            </div>
+                        </td>
+
                         <!-- Account Subclass -->
                         <td class="min-w-48" x-data="{
                             open: false,
@@ -333,6 +356,10 @@
                                         this.item.account_type_name = '';
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
+                                        // Reset sort orders
+                                        this.item.account_subclass_sort_order = 1;
+                                        this.item.account_type_sort_order = 1;
+                                        this.item.account_subtype_sort_order = 0;
                                         this.searchText = '';
                                     }
                                 });
@@ -349,6 +376,9 @@
                                         this.item.account_type_name = '';
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
+                                        // Reset sort orders
+                                        this.item.account_type_sort_order = 1;
+                                        this.item.account_subtype_sort_order = 0;
                                     }
                                 });
                                 this.$watch('item.account_subclass_name', () => {
@@ -394,6 +424,9 @@
                                 this.item.account_subtype_id = '';
                                 this.item.account_subtype_name = '';
                                 this.item.account_code = '';
+                                // Reset sort orders when hierarchy changes
+                                this.item.account_type_sort_order = 1;
+                                this.item.account_subtype_sort_order = 0;
                                 this.open = false;
                             }
                         }" x-init="init()">
@@ -432,6 +465,19 @@
                             </div>
                         </td>
 
+                        <!-- Account Type Sort Order -->
+                        <td class="min-w-24">
+                            <div class="fi-input-wrp fi-fo-text-input">
+                                <div class="fi-input-wrp-content-ctn">
+                                    <input type="number"
+                                           x-model="item.account_type_sort_order"
+                                           min="1"
+                                           class="fi-input"
+                                           placeholder="1">
+                                </div>
+                            </div>
+                        </td>
+
                         <!-- Account Type -->
                         <td class="min-w-48" x-data="{
                             open: false,
@@ -456,6 +502,9 @@
                                         this.item.account_type_name = '';
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
+                                        // Reset sort orders
+                                        this.item.account_type_sort_order = 1;
+                                        this.item.account_subtype_sort_order = 0;
                                         this.searchText = '';
                                     }
                                 });
@@ -469,6 +518,8 @@
                                     if (!this.item.account_type_id) {
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
+                                        // Reset subtype sort order
+                                        this.item.account_subtype_sort_order = 0;
                                     }
                                 });
                                 this.$watch('item.account_type_name', () => {
@@ -512,6 +563,8 @@
                                 this.item.account_subtype_id = '';
                                 this.item.account_subtype_name = '';
                                 this.item.account_code = '';
+                                // Reset subtype sort order when type changes
+                                this.item.account_subtype_sort_order = 0;
                                 this.open = false;
                             }
                         }" x-init="init()">
@@ -550,6 +603,19 @@
                             </div>
                         </td>
 
+                        <!-- Account Subtype Sort Order -->
+                        <td class="min-w-24">
+                            <div class="fi-input-wrp fi-fo-text-input">
+                                <div class="fi-input-wrp-content-ctn">
+                                    <input type="number"
+                                           x-model="item.account_subtype_sort_order"
+                                           min="0"
+                                           class="fi-input"
+                                           placeholder="0">
+                                </div>
+                            </div>
+                        </td>
+
                         <!-- Account Subtype -->
                         <td class="min-w-48" x-data="{
                             open: false,
@@ -572,6 +638,8 @@
                                     if (!this.item.account_type_id && !this.item.account_type_name) {
                                         this.item.account_subtype_id = '';
                                         this.item.account_subtype_name = '';
+                                        // Reset subtype sort order
+                                        this.item.account_subtype_sort_order = 0;
                                         this.searchText = '';
                                     }
                                 });
