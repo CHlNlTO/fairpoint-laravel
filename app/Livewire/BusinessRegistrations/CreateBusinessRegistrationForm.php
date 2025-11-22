@@ -90,6 +90,12 @@ class CreateBusinessRegistrationForm extends Component
     ];
     public array $selectedCoaItems = [];
 
+    // Hierarchy data for COA item creation
+    public array $accountClasses = [];
+    public array $accountSubclasses = [];
+    public array $accountTypes = [];
+    public array $accountSubtypes = [];
+
     public ?string $birAgencyId = null;
 
     public function mount(): void
@@ -602,7 +608,8 @@ class CreateBusinessRegistrationForm extends Component
     protected function loadCoaTemplateData(): void
     {
         // OPTIMIZED: Cache COA data for 1 hour to avoid repeated DB queries
-        $cachedData = Cache::remember('coa_template_data_v2', 3600, function () {
+        // Updated cache key to v3 to include hierarchy data
+        $cachedData = Cache::remember('coa_template_data_v3', 3600, function () {
             // Normalize all IDs to strings for consistent client-side matching
             $classCodes = AccountClass::where('is_active', true)
                 ->orderBy('code')
@@ -772,6 +779,58 @@ class CreateBusinessRegistrationForm extends Component
                 $taxTypeRelations[$taxTypeId][] = $accountItemId;
             }
 
+            // Load hierarchy data for COA item creation
+            $accountClasses = AccountClass::where('is_active', true)
+                ->orderBy('code')
+                ->get()
+                ->map(function ($class) {
+                    return [
+                        'id' => (string) $class->id,
+                        'code' => $class->code,
+                        'name' => $class->name,
+                    ];
+                })
+                ->toArray();
+
+            $accountSubclasses = AccountSubclass::where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(function ($subclass) {
+                    return [
+                        'id' => (string) $subclass->id,
+                        'account_class_id' => (string) $subclass->account_class_id,
+                        'name' => $subclass->name,
+                        'sort_order' => $subclass->sort_order ?? 1,
+                    ];
+                })
+                ->toArray();
+
+            $accountTypes = AccountType::where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(function ($type) {
+                    return [
+                        'id' => (string) $type->id,
+                        'account_subclass_id' => (string) $type->account_subclass_id,
+                        'name' => $type->name,
+                        'sort_order' => $type->sort_order ?? 1,
+                    ];
+                })
+                ->toArray();
+
+            $accountSubtypes = AccountSubtype::where('is_active', true)
+                ->orderBy('name')
+                ->get()
+                ->map(function ($subtype) {
+                    return [
+                        'id' => (string) $subtype->id,
+                        'account_type_id' => (string) $subtype->account_type_id,
+                        'name' => $subtype->name,
+                        'sort_order' => $subtype->sort_order ?? 0,
+                    ];
+                })
+                ->toArray();
+
             return [
                 'items' => $coaItems,
                 'businessTypes' => $businessTypeRelations,
@@ -783,6 +842,12 @@ class CreateBusinessRegistrationForm extends Component
                     'typeOrders' => $typeOrders,
                     'subtypeOrders' => $subtypeOrders,
                 ],
+                'hierarchy' => [
+                    'accountClasses' => $accountClasses,
+                    'accountSubclasses' => $accountSubclasses,
+                    'accountTypes' => $accountTypes,
+                    'accountSubtypes' => $accountSubtypes,
+                ],
             ];
         });
 
@@ -791,6 +856,72 @@ class CreateBusinessRegistrationForm extends Component
         $this->coaItemsByIndustryType = $cachedData['industryTypes'];
         $this->coaItemsByTaxType = $cachedData['taxTypes'];
         $this->coaStructure = $cachedData['structure'];
+
+        // Handle hierarchy data with fallback for old cached data
+        $hierarchy = $cachedData['hierarchy'] ?? [];
+        $this->accountClasses = $hierarchy['accountClasses'] ?? [];
+        $this->accountSubclasses = $hierarchy['accountSubclasses'] ?? [];
+        $this->accountTypes = $hierarchy['accountTypes'] ?? [];
+        $this->accountSubtypes = $hierarchy['accountSubtypes'] ?? [];
+
+        // If hierarchy data is missing, load it directly (shouldn't happen with v3 cache, but safety fallback)
+        if (empty($this->accountClasses)) {
+            $this->loadHierarchyDataFallback();
+        }
+    }
+
+    protected function loadHierarchyDataFallback(): void
+    {
+        $this->accountClasses = AccountClass::where('is_active', true)
+            ->orderBy('code')
+            ->get()
+            ->map(function ($class) {
+                return [
+                    'id' => (string) $class->id,
+                    'code' => $class->code,
+                    'name' => $class->name,
+                ];
+            })
+            ->toArray();
+
+        $this->accountSubclasses = AccountSubclass::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($subclass) {
+                return [
+                    'id' => (string) $subclass->id,
+                    'account_class_id' => (string) $subclass->account_class_id,
+                    'name' => $subclass->name,
+                    'sort_order' => $subclass->sort_order ?? 1,
+                ];
+            })
+            ->toArray();
+
+        $this->accountTypes = AccountType::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($type) {
+                return [
+                    'id' => (string) $type->id,
+                    'account_subclass_id' => (string) $type->account_subclass_id,
+                    'name' => $type->name,
+                    'sort_order' => $type->sort_order ?? 1,
+                ];
+            })
+            ->toArray();
+
+        $this->accountSubtypes = AccountSubtype::where('is_active', true)
+            ->orderBy('name')
+            ->get()
+            ->map(function ($subtype) {
+                return [
+                    'id' => (string) $subtype->id,
+                    'account_type_id' => (string) $subtype->account_type_id,
+                    'name' => $subtype->name,
+                    'sort_order' => $subtype->sort_order ?? 0,
+                ];
+            })
+            ->toArray();
     }
 
     protected function sanitizePostalCode(?string $postalCode): ?string

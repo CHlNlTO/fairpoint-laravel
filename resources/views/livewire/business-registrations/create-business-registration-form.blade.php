@@ -29,6 +29,12 @@
     coaStructure: @js($coaStructure),
     coaItemsById: {},
 
+    // Hierarchy data for COA item creation
+    accountClasses: @js($accountClasses),
+    accountSubclasses: @js($accountSubclasses),
+    accountTypes: @js($accountTypes),
+    accountSubtypes: @js($accountSubtypes),
+
     // Lookup data
     allRegions: @js($regions),
     allProvincesLookup: @js($provinceLookup),
@@ -113,6 +119,17 @@
                 this.filterCoaItems();
             }
         });
+
+        // Store reference to parent scope methods for nested Alpine contexts
+        this.parentScope = {
+            updateAccountCodeDebounced: (item) => this.updateAccountCodeDebounced(item),
+            updateAccountCodeOnBlur: (item) => this.updateAccountCodeOnBlur(item),
+            generateAccountCodeFromItem: (item) => this.generateAccountCodeFromItem(item),
+            updateSelectedCoaItems: () => this.updateSelectedCoaItems(),
+            onTypeChange: (item, typeId) => this.onTypeChange(item, typeId),
+            removeCoaItemRow: (index) => this.removeCoaItemRow(index),
+            addCoaItemRow: (index) => this.addCoaItemRow(index),
+        };
     },
 
     cacheFilteredOptions() {
@@ -315,14 +332,24 @@
             });
         }
 
-        this.coaPreview = enrichedItems.map(item => ({
+        // Transform to editable format for preview
+        // System items (isEditable: false) - only Account Name, Account Subtype, and Normal Balance are editable
+        // User-added items (isEditable: true) - all fields are editable
+        this.coaPreview = enrichedItems.map((item, index) => ({
+            id: item.id || `temp-${index}`,
+            isEditable: false, // Pre-filtered items from server are system items
+            isUserAdded: false, // Mark as system item
             account_code: item.account_code,
             account_name: item.account_name,
+            account_class_id: item.account_class_id || '',
             account_class_name: item.account_class_name ?? 'N/A',
+            account_subclass_id: item.account_subclass_id || '',
             account_subclass_name: item.account_subclass_name ?? 'N/A',
+            account_type_id: item.account_type_id || '',
             account_type_name: item.account_type_name ?? 'N/A',
-            account_subtype: item.account_subtype ?? 'N/A',
-            normal_balance: item.normal_balance_label,
+            account_subtype_name: item.account_subtype ?? 'N/A',
+            normal_balance: item.normal_balance || 'debit',
+            normal_balance_label: item.normal_balance_label || 'Debit',
         }));
 
         this.selectedCoaItems = enrichedItems.map(item => ({
@@ -335,6 +362,207 @@
             normal_balance: item.normal_balance,
             is_active: item.is_active,
         }));
+    },
+
+    addCoaItemRow(insertAfterIndex) {
+        const newItem = {
+            id: `new-${Date.now()}-${Math.random()}`,
+            isEditable: true,
+            isUserAdded: true, // Mark as user-added item
+            account_code: '',
+            account_name: '',
+            account_class_id: '',
+            account_class_name: '',
+            account_subclass_id: '',
+            account_subclass_name: '',
+            account_type_id: '',
+            account_type_name: '',
+            account_subtype_name: '',
+            normal_balance: 'debit',
+            normal_balance_label: 'Debit',
+        };
+
+        if (insertAfterIndex !== undefined && insertAfterIndex >= 0 && insertAfterIndex < this.coaPreview.length) {
+            this.coaPreview.splice(insertAfterIndex + 1, 0, newItem);
+        } else {
+            this.coaPreview.push(newItem);
+        }
+        this.updateSelectedCoaItems();
+    },
+
+    removeCoaItemRow(index) {
+        if (index !== undefined && index >= 0 && index < this.coaPreview.length) {
+            const item = this.coaPreview[index];
+            if (item && item.isUserAdded) {
+                this.coaPreview.splice(index, 1);
+                this.updateSelectedCoaItems();
+            }
+        }
+    },
+
+    // Debounced account code generation
+    debounceTimers: {},
+    updateAccountCodeDebounced(item) {
+        // Clear existing timeout for this item
+        if (this.debounceTimers[item.id]) {
+            clearTimeout(this.debounceTimers[item.id]);
+        }
+
+        // Set new timeout (3 seconds)
+        this.debounceTimers[item.id] = setTimeout(() => {
+            if (item.account_class_id && item.account_subclass_id) {
+                item.account_code = this.generateAccountCodeFromItem(item);
+                this.updateSelectedCoaItems();
+            }
+            delete this.debounceTimers[item.id];
+        }, 3000);
+    },
+
+    // Update account code on blur (immediate)
+    updateAccountCodeOnBlur(item) {
+        // Clear any pending debounce for this item
+        if (this.debounceTimers[item.id]) {
+            clearTimeout(this.debounceTimers[item.id]);
+            delete this.debounceTimers[item.id];
+        }
+
+        if (item.account_class_id && item.account_subclass_id) {
+            item.account_code = this.generateAccountCodeFromItem(item);
+            this.updateSelectedCoaItems();
+        }
+    },
+
+    updateSelectedCoaItems() {
+        this.selectedCoaItems = this.coaPreview
+            .filter(item => item.account_name && item.account_class_id && item.account_subclass_id)
+            .map(item => {
+                const accountCode = item.account_code || this.generateAccountCodeFromItem(item);
+                return {
+                    coa_item_id: item.id && !item.id.startsWith('new-') ? item.id : null,
+                    account_code: accountCode,
+                    account_class: item.account_class_name || 'N/A',
+                    account_subclass: item.account_subclass_name || 'N/A',
+                    account_type: item.account_type_name || item.account_type_name || 'N/A',
+                    account_subtype: item.account_subtype_name || 'N/A',
+                    normal_balance: item.normal_balance || 'debit',
+                    is_active: true,
+                    // Store hierarchy IDs for new items
+                    account_class_id: item.account_class_id,
+                    account_subclass_id: item.account_subclass_id,
+                    account_type_id: item.account_type_id,
+                    account_type_name: item.account_type_name,
+                    account_subtype_name: item.account_subtype_name,
+                };
+            });
+    },
+
+    generateAccountCodeFromItem(item) {
+        if (!item.account_class_id || !item.account_subclass_id) {
+            return item.account_code || '';
+        }
+
+        const classCodes = this.coaStructure.classCodes || {};
+        const subclassOrders = this.coaStructure.subclassOrders || {};
+        const typeOrders = this.coaStructure.typeOrders || {};
+        const subtypeOrders = this.coaStructure.subtypeOrders || {};
+
+        const classDigit = this.padNumber(classCodes[item.account_class_id] ?? 0, 1);
+        const subclassDigit = this.padNumber(subclassOrders[item.account_subclass_id] ?? 1, 1);
+
+        // For type, if we have an ID, use it; otherwise, use a default of 1
+        // Note: custom typed types won't have orders, so they'll get default value
+        const typeDigits = item.account_type_id
+            ? this.padNumber(typeOrders[item.account_type_id] ?? 1, 2)
+            : this.padNumber(1, 2);
+
+        // For subtype, if we have an ID, use it; otherwise, use a default of 0
+        // Note: custom typed subtypes won't have orders, so they'll get default value
+        const subtypeDigits = item.account_subtype_id
+            ? this.padNumber(subtypeOrders[item.account_subtype_id] ?? 0, 2)
+            : this.padNumber(0, 2);
+
+        return `${classDigit}${subclassDigit}${typeDigits}${subtypeDigits}`;
+    },
+
+    onClassChange(item, classId) {
+        const selectedClass = this.accountClasses.find(c => c.id === classId);
+        if (selectedClass) {
+            item.account_class_id = selectedClass.id;
+            item.account_class_name = selectedClass.name;
+            item.account_subclass_id = '';
+            item.account_subclass_name = '';
+            item.account_type_id = '';
+            item.account_type_name = '';
+            item.account_subtype_name = '';
+            if (item.account_class_id) {
+                item.account_code = this.generateAccountCodeFromItem(item);
+            }
+            this.updateSelectedCoaItems();
+        }
+    },
+
+    onSubclassChange(item, subclassId) {
+        const selectedSubclass = this.accountSubclasses.find(s => s.id === subclassId);
+        if (selectedSubclass) {
+            item.account_subclass_id = selectedSubclass.id;
+            item.account_subclass_name = selectedSubclass.name;
+            item.account_type_id = '';
+            item.account_type_name = '';
+            item.account_subtype_name = '';
+            if (item.account_class_id) {
+                item.account_code = this.generateAccountCodeFromItem(item);
+            }
+            this.updateSelectedCoaItems();
+        }
+    },
+
+    onTypeChange(item, typeId) {
+        const selectedType = this.accountTypes.find(t => t.id === typeId);
+        if (selectedType) {
+            item.account_type_id = selectedType.id;
+            item.account_type_name = selectedType.name;
+            item.account_subtype_name = '';
+            if (item.account_class_id) {
+                item.account_code = this.generateAccountCodeFromItem(item);
+            }
+            this.updateSelectedCoaItems();
+        }
+    },
+
+    onTypeInput(item, typeName) {
+        if (typeName) {
+            // Check if it matches an existing type
+            const matchingType = this.accountTypes.find(t =>
+                t.account_subclass_id === item.account_subclass_id &&
+                t.name.toLowerCase() === typeName.toLowerCase()
+            );
+
+            if (matchingType) {
+                item.account_type_id = matchingType.id;
+                item.account_type_name = matchingType.name;
+            } else {
+                // Allow custom type name
+                item.account_type_id = '';
+                item.account_type_name = typeName;
+            }
+        } else {
+            item.account_type_id = '';
+            item.account_type_name = '';
+        }
+        if (item.account_class_id) {
+            item.account_code = this.generateAccountCodeFromItem(item);
+        }
+        this.updateSelectedCoaItems();
+    },
+
+    getAvailableSubclasses(classId) {
+        if (!classId) return [];
+        return this.accountSubclasses.filter(s => s.account_class_id === classId);
+    },
+
+    getAvailableTypes(subclassId) {
+        if (!subclassId) return [];
+        return this.accountTypes.filter(t => t.account_subclass_id === subclassId);
     },
 
     collectSelectedTaxTypeIds() {
@@ -843,25 +1071,247 @@
                             <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" x-show="coaPreview.length > 0">
                                 <thead class="bg-gray-50 dark:bg-gray-800/60">
                                     <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Account Code</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Account Name</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Class</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Subclass</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Type</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Subtype</th>
-                                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Normal Balance</th>
+                                        <th class="px-2 py-2 w-8"></th>
+                                        <th class="px-2 py-2 w-8"></th>
+                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Account Code</th>
+                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Account Name</th>
+                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Class</th>
+                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Subclass</th>
+                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Type</th>
+                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Subtype</th>
+                                        <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Normal Balance</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
-                                    <template x-for="item in coaPreview" :key="item.account_code">
-                                        <tr>
-                                            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-gray-100" x-text="item.account_code"></td>
-                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_name"></td>
-                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_class_name"></td>
-                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_subclass_name"></td>
-                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_type_name"></td>
-                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.account_subtype"></td>
-                                            <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300" x-text="item.normal_balance"></td>
+                                    <template x-for="(item, index) in coaPreview" :key="item.id || index">
+                                        <tr class="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors" x-data="{ hovered: false, parentScope: parentScope }" @mouseenter="hovered = true" @mouseleave="hovered = false">
+                                            <!-- Plus Button (visible on hover) -->
+                                            <td class="px-2 py-2 w-8" style="min-width: 32px;">
+                                                <button type="button"
+                                                        @click="parentScope ? parentScope.addCoaItemRow(index) : addCoaItemRow(index)"
+                                                        :class="{ 'invisible': !hovered, 'visible': hovered }"
+                                                        class="transition-opacity p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-primary-600 dark:text-primary-400"
+                                                        title="Add row below">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                                    </svg>
+                                                </button>
+                                            </td>
+
+                                            <!-- Delete Button (only for user-added items) -->
+                                            <td class="px-2 py-2 w-8" style="min-width: 32px;">
+                                                <button type="button"
+                                                        @click="parentScope ? parentScope.removeCoaItemRow(index) : removeCoaItemRow(index)"
+                                                        :class="{ 'invisible': !hovered || !item.isUserAdded, 'visible': hovered && item.isUserAdded }"
+                                                        class="transition-opacity p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                                                        title="Delete row">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                    </svg>
+                                                </button>
+                                            </td>
+
+                                            <!-- Account Code -->
+                                            <td class="px-2 py-2">
+                                                <span class="text-xs font-medium text-gray-900 dark:text-gray-100"
+                                                      x-text="item.account_code || (item.account_class_id && item.account_subclass_id ? generateAccountCodeFromItem(item) : '-')"></span>
+                                            </td>
+
+                                            <!-- Account Name -->
+                                            <td class="px-2 py-2">
+                                                <input type="text"
+                                                       x-model="item.account_name"
+                                                       @input="item.account_code = item.account_class_id ? generateAccountCodeFromItem(item) : item.account_code; updateSelectedCoaItems();"
+                                                       class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                                       placeholder="Enter account name">
+                                            </td>
+
+                                            <!-- Account Class (Dropdown only - disabled for system items) -->
+                                            <td class="px-2 py-2">
+                                                <template x-if="!item.isUserAdded">
+                                                    <span class="text-xs text-gray-700 dark:text-gray-300" x-text="item.account_class_name || 'N/A'"></span>
+                                                </template>
+                                                <template x-if="item.isUserAdded">
+                                                    <select x-model="item.account_class_id"
+                                                            @change="onClassChange(item, item.account_class_id)"
+                                                            class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500">
+                                                        <option value="">Select class</option>
+                                                        <template x-for="ac in accountClasses" :key="ac.id">
+                                                            <option :value="ac.id" x-text="ac.name"></option>
+                                                        </template>
+                                                    </select>
+                                                </template>
+                                            </td>
+
+                                            <!-- Account Subclass (Dropdown only - disabled for system items) -->
+                                            <td class="px-2 py-2">
+                                                <template x-if="!item.isUserAdded">
+                                                    <span class="text-xs text-gray-700 dark:text-gray-300" x-text="item.account_subclass_name || 'N/A'"></span>
+                                                </template>
+                                                <template x-if="item.isUserAdded">
+                                                    <select x-model="item.account_subclass_id"
+                                                            @change="onSubclassChange(item, item.account_subclass_id)"
+                                                            :disabled="!item.account_class_id"
+                                                            class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                        <option value="">Select subclass</option>
+                                                        <template x-for="sc in getAvailableSubclasses(item.account_class_id)" :key="sc.id">
+                                                            <option :value="sc.id" x-text="sc.name"></option>
+                                                        </template>
+                                                    </select>
+                                                </template>
+                                            </td>
+
+                                            <!-- Account Type (Combobox for user items, text for system items) -->
+                                            <td class="px-2 py-2">
+                                                <template x-if="!item.isUserAdded">
+                                                    <span class="text-xs text-gray-700 dark:text-gray-300" x-text="item.account_type_name || 'N/A'"></span>
+                                                </template>
+                                                <template x-if="item.isUserAdded" x-data="{
+                                                    item: item,
+                                                    accountTypes: accountTypes,
+                                                    parentScope: parentScope,
+                                                    open: false,
+                                                    searchText: '',
+                                                    filteredOptions: [],
+                                                    init() {
+                                                        this.updateDisplay();
+                                                        this.updateFilteredOptions();
+
+                                                        this.$watch('item.account_subclass_id', () => {
+                                                            this.updateFilteredOptions();
+                                                            if (!this.item.account_subclass_id) {
+                                                                this.item.account_type_id = '';
+                                                                this.item.account_type_name = '';
+                                                                this.searchText = '';
+                                                            }
+                                                        });
+
+                                                        this.$watch('item.account_type_name', () => {
+                                                            this.updateDisplay();
+                                                            // Enable subtype input when type name is filled
+                                                            // This is handled by the disabled condition on the subtype input
+                                                        });
+
+                                                        this.$watch('searchText', (value) => {
+                                                            this.updateFilteredOptions();
+                                                            if (value) {
+                                                                const exactMatch = this.filteredOptions.find(t =>
+                                                                    t.name.toLowerCase() === value.toLowerCase()
+                                                                );
+                                                                if (!exactMatch && this.item.account_subclass_id) {
+                                                                    this.item.account_type_name = value;
+                                                                    this.item.account_type_id = '';
+                                                                    // Trigger debounced update
+                                                                    if (this.parentScope && this.parentScope.updateAccountCodeDebounced) {
+                                                                        this.parentScope.updateAccountCodeDebounced(this.item);
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                this.item.account_type_name = '';
+                                                                this.item.account_type_id = '';
+                                                                if (this.item.account_class_id && this.item.account_subclass_id) {
+                                                                    if (this.parentScope && this.parentScope.updateAccountCodeDebounced) {
+                                                                        this.parentScope.updateAccountCodeDebounced(this.item);
+                                                                    }
+                                                                }
+                                                            }
+                                                        });
+                                                    },
+                                                    updateDisplay() {
+                                                        if (this.item.account_type_id) {
+                                                            const selected = this.accountTypes.find(t => t.id === this.item.account_type_id);
+                                                            if (selected) {
+                                                                this.searchText = selected.name;
+                                                            }
+                                                        } else if (this.item.account_type_name) {
+                                                            this.searchText = this.item.account_type_name;
+                                                        } else {
+                                                            this.searchText = '';
+                                                        }
+                                                    },
+                                                    updateFilteredOptions() {
+                                                        if (!this.item.account_subclass_id) {
+                                                            this.filteredOptions = [];
+                                                            return;
+                                                        }
+                                                        this.filteredOptions = this.accountTypes.filter(t =>
+                                                            t.account_subclass_id === this.item.account_subclass_id
+                                                        );
+
+                                                        if (this.searchText) {
+                                                            this.filteredOptions = this.filteredOptions.filter(t =>
+                                                                t.name.toLowerCase().includes(this.searchText.toLowerCase())
+                                                            );
+                                                        }
+                                                    },
+                                                    selectOption(option) {
+                                                        if (this.parentScope && this.parentScope.onTypeChange) {
+                                                            this.parentScope.onTypeChange(this.item, option.id);
+                                                        }
+                                                        this.searchText = option.name;
+                                                        this.open = false;
+                                                        // Immediately update account code when option is selected
+                                                        if (this.item.account_class_id && this.item.account_subclass_id) {
+                                                            if (this.parentScope && this.parentScope.generateAccountCodeFromItem) {
+                                                                this.item.account_code = this.parentScope.generateAccountCodeFromItem(this.item);
+                                                                if (this.parentScope.updateSelectedCoaItems) {
+                                                                    this.parentScope.updateSelectedCoaItems();
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }" x-init="init()">
+                                                    <div class="relative">
+                                                        <input type="text"
+                                                               x-model="searchText"
+                                                               @click.stop="open = !open; if (!open) updateFilteredOptions();"
+                                                               @focus="open = true; updateFilteredOptions();"
+                                                               @keydown.escape="open = false"
+                                                               @blur="setTimeout(() => { open = false; }, 200); if (parentScope && parentScope.updateAccountCodeOnBlur) parentScope.updateAccountCodeOnBlur(item)"
+                                                               :disabled="!item.account_subclass_id"
+                                                               class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                               placeholder="Type or select">
+                                                        <div x-show="open && filteredOptions.length > 0"
+                                                             x-transition:enter="transition ease-out duration-100"
+                                                             x-transition:enter-start="transform opacity-0 scale-95"
+                                                             x-transition:enter-end="transform opacity-100 scale-100"
+                                                             x-transition:leave="transition ease-in duration-75"
+                                                             x-transition:leave-start="transform opacity-100 scale-100"
+                                                             x-transition:leave-end="transform opacity-0 scale-95"
+                                                             @click.outside="open = false"
+                                                             @click.stop
+                                                             class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-48 overflow-y-auto">
+                                                            <template x-for="option in filteredOptions" :key="option.id">
+                                                                <div @click="selectOption(option); $event.stopPropagation();"
+                                                                     :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_type_id === option.id }"
+                                                                     class="px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                                                                     x-text="option.name"></div>
+                                                            </template>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </td>
+
+                                            <!-- Account Subtype (Text input only - editable for both system and user items) -->
+                                            <td class="px-2 py-2">
+                                                <input type="text"
+                                                       x-model="item.account_subtype_name"
+                                                       @input="parentScope ? parentScope.updateAccountCodeDebounced(item) : updateAccountCodeDebounced(item); parentScope ? parentScope.updateSelectedCoaItems() : updateSelectedCoaItems();"
+                                                       @blur="parentScope ? parentScope.updateAccountCodeOnBlur(item) : updateAccountCodeOnBlur(item)"
+                                                       :disabled="!item.account_type_id && !item.account_type_name"
+                                                       class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                       placeholder="Enter subtype">
+                                            </td>
+
+                                            <!-- Normal Balance -->
+                                            <td class="px-2 py-2">
+                                                <select x-model="item.normal_balance"
+                                                        @change="item.normal_balance_label = formatBalance(item.normal_balance); updateSelectedCoaItems();"
+                                                        class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500">
+                                                    <option value="debit">Debit</option>
+                                                    <option value="credit">Credit</option>
+                                                </select>
+                                            </td>
                                         </tr>
                                     </template>
                                 </tbody>
