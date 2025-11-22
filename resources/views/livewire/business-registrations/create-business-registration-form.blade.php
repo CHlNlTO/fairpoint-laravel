@@ -19,6 +19,11 @@
     government_agency_ids: [],
     taxSelections: @js($taxSelections),
 
+    // COA Source selection: 'default' or 'import'
+    coaSource: 'default',
+    uploadedFileName: '',
+    csvHeaders: [],
+
     // COA Preview - loaded upfront for instant filtering
     coaPreview: [],
     selectedCoaItems: [],
@@ -118,6 +123,13 @@
                 // COA data is already loaded - just filter it to reflect current state
                 this.filterCoaItems();
             }
+        });
+
+        // Watch for CSV headers changes and update select options
+        this.$watch('csvHeaders', () => {
+            this.$nextTick(() => {
+                this.populateSelectOptions();
+            });
         });
 
         // Store reference to parent scope methods for nested Alpine contexts
@@ -927,6 +939,173 @@
         return normalized.charAt(0).toUpperCase() + normalized.slice(1);
     },
 
+    handleFileUpload(event) {
+        const file = event.target.files[0];
+        if (!file) {
+            this.uploadedFileName = '';
+            this.csvHeaders = [];
+            return;
+        }
+
+        // Validate file type
+        if (!file.name.endsWith('.csv')) {
+            alert('Please upload a CSV file.');
+            event.target.value = '';
+            this.uploadedFileName = '';
+            this.csvHeaders = [];
+            return;
+        }
+
+        // Validate file size (5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB in bytes
+        if (file.size > maxSize) {
+            alert('File size must be less than 5MB.');
+            event.target.value = '';
+            this.uploadedFileName = '';
+            this.csvHeaders = [];
+            return;
+        }
+
+        // Store the filename
+        this.uploadedFileName = file.name;
+
+        // Parse CSV file
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target.result;
+                this.parseCSVHeaders(text);
+                // Update select options after parsing
+                this.$nextTick(() => {
+                    this.updateSelectOptions();
+                });
+            } catch (error) {
+                console.error('Error reading file:', error);
+                alert('Error reading CSV file. Please try again.');
+                this.uploadedFileName = '';
+                this.csvHeaders = [];
+            }
+        };
+        reader.onerror = () => {
+            alert('Error reading file. Please try again.');
+            this.uploadedFileName = '';
+            this.csvHeaders = [];
+        };
+        reader.readAsText(file, 'UTF-8');
+    },
+
+    populateSelectOptions() {
+        // Get all select elements in the field mapping section
+        const selectIds = [
+            'coa_mapping_account_name',
+            'coa_mapping_account_subtype',
+            'coa_mapping_account_type',
+            'coa_mapping_account_subclass',
+            'coa_mapping_account_class',
+            'coa_mapping_normal_balance'
+        ];
+
+        selectIds.forEach(selectId => {
+            const select = document.getElementById(selectId);
+            if (select) {
+                // Store current selected value
+                const currentValue = select.value;
+
+                while (select.options.length > 1) {
+                    select.remove(1);
+                }
+
+                // Add options from csvHeaders
+                if (this.csvHeaders && this.csvHeaders.length > 0) {
+                    this.csvHeaders.forEach(header => {
+                        const option = document.createElement('option');
+                        option.value = header;
+                        option.textContent = header;
+                        select.appendChild(option);
+                    });
+
+                    // Restore previous selection if it still exists
+                    if (currentValue && this.csvHeaders.includes(currentValue)) {
+                        select.value = currentValue;
+                    }
+                }
+            }
+        });
+    },
+
+    parseCSVHeaders(text) {
+        try {
+            // Split by newlines and get first line
+            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+
+            if (lines.length === 0) {
+                alert('CSV file is empty.');
+                this.csvHeaders = [];
+                return;
+            }
+
+            // Parse first line as headers
+            const firstLine = lines[0];
+            const headers = this.parseCSVLine(firstLine);
+
+            // Filter out empty headers and trim whitespace
+            this.csvHeaders = headers
+                .map(header => header.trim())
+                .filter(header => header !== '');
+
+            if (this.csvHeaders.length === 0) {
+                alert('No valid headers found in CSV file.');
+                this.csvHeaders = [];
+                return;
+            }
+
+            console.log('CSV headers extracted:', this.csvHeaders);
+
+            // Populate select options after parsing
+            this.$nextTick(() => {
+                this.populateSelectOptions();
+            });
+        } catch (error) {
+            console.error('Error parsing CSV:', error);
+            alert('Error parsing CSV file. Please check the file format.');
+            this.csvHeaders = [];
+        }
+    },
+
+    parseCSVLine(line) {
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        const quoteCode = 34; // Double quote character code
+
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            const charCode = char.charCodeAt(0);
+            const nextChar = line[i + 1];
+
+            if (charCode === quoteCode) {
+                if (inQuotes && nextChar && nextChar.charCodeAt(0) === quoteCode) {
+                    // Escaped quote
+                    current += char;
+                    i++; // Skip next quote
+                } else {
+                    // Toggle quote state
+                    inQuotes = !inQuotes;
+                }
+            } else if (char === ',' && !inQuotes) {
+                // End of field
+                result.push(current.trim());
+                current = '';
+            } else {
+                current += char;
+            }
+        }
+
+        // Add last field
+        result.push(current.trim());
+        return result;
+    },
+
     submitForm() {
         // OPTIMIZED: Batch all updates without await (no server round trips until submit)
         // This makes the submission instant instead of taking several minutes
@@ -976,10 +1155,10 @@
                         <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $label }}</span>
                         <span class="text-xs text-gray-500 dark:text-gray-400">
                             @switch($stepNumber)
-                                @case(1)Company and address details.@break
+                                @case(1)Business address details.@break
                                 @case(2)Choose applicable industries.@break
                                 @case(3)Set reporting period.@break
-                                @case(4)Pick business configuration.@break
+                                @case(4)Choose business configuration.@break
                                 @case(5)Select government agencies.@break
                                 @case(6)Configure tax types if needed.@break
                                 @case(7)Review account selections.@break
@@ -989,6 +1168,32 @@
                 </li>
             @endforeach
         </ol>
+    </div>
+
+    <div class="flex items-center justify-between">
+        <button type="button"
+                @click="previousStep()"
+                :disabled="currentStep === 1"
+                class="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+            Previous
+        </button>
+
+        <div class="flex items-center gap-3">
+            <button type="button"
+                    x-show="currentStep < 7"
+                    @click="nextStep()"
+                    class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors">
+                Next Step
+            </button>
+            <button type="submit"
+                    x-show="currentStep === 7"
+                    wire:loading.attr="disabled"
+                    class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                <span wire:loading wire:target="submit" class="h-4 w-4 animate-spin border-2 border-white border-t-transparent rounded-full"></span>
+                <span wire:loading.remove wire:target="submit">Create Registration</span>
+                <span wire:loading wire:target="submit">Saving...</span>
+            </button>
+        </div>
     </div>
 
     <form @submit.prevent="submitForm()" class="space-y-6">
@@ -1386,8 +1591,45 @@
         <div x-show="currentStep === 7">
             <div class="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6">
                 <div class="space-y-3">
-                    <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Chart of Accounts Preview</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Based on your selections, these accounts will be connected to the business registration.</p>
+                    <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Chart of Accounts</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Choose how you want to set up your Chart of Accounts.</p>
+
+                    <!-- COA Source Selection -->
+                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <label class="flex items-start gap-3 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
+                               :class="{ 'border-primary-500 dark:border-primary-500 bg-primary-50 dark:bg-primary-900/20': coaSource === 'default' }">
+                            <input type="radio"
+                                   name="coa_source"
+                                   value="default"
+                                   x-model="coaSource"
+                                   class="mt-1 fi-radio-input h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:checked:border-primary-600 dark:checked:bg-primary-600">
+                            <div class="flex-1">
+                                <span class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Use Default COA Template</span>
+                                <span class="block text-xs text-gray-500 dark:text-gray-400 mt-1">Use system-generated accounts based on your selections</span>
+                            </div>
+                        </label>
+
+                        <label class="flex items-start gap-3 rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 cursor-pointer hover:border-primary-400 dark:hover:border-primary-500 transition-colors"
+                               :class="{ 'border-primary-500 dark:border-primary-500 bg-primary-50 dark:bg-primary-900/20': coaSource === 'import' }">
+                            <input type="radio"
+                                   name="coa_source"
+                                   value="import"
+                                   x-model="coaSource"
+                                   class="mt-1 fi-radio-input h-4 w-4 border-gray-300 text-primary-600 focus:ring-primary-600 shadow-sm dark:border-gray-600 dark:bg-gray-700 dark:checked:border-primary-600 dark:checked:bg-primary-600">
+                            <div class="flex-1">
+                                <span class="block text-sm font-semibold text-gray-900 dark:text-gray-100">Import Your Chart of Accounts</span>
+                                <span class="block text-xs text-gray-500 dark:text-gray-400 mt-1">Upload a CSV file with your custom accounts</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Default COA Preview -->
+                <div x-show="coaSource === 'default'" class="space-y-3">
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Chart of Accounts Preview</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Based on your selections, these accounts will be connected to the business registration.</p>
+                    </div>
 
                     <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
                         <!-- Table -->
@@ -1655,32 +1897,127 @@
                         <span>This list dynamically updates whenever you modify industries, business type, or tax selections.</span>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <div class="flex items-center justify-between">
-            <button type="button"
-                    @click="previousStep()"
-                    :disabled="currentStep === 1"
-                    class="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                Previous
-            </button>
+                <!-- Import COA Section -->
+                <div x-show="coaSource === 'import'" class="space-y-3">
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Import Your Chart of Accounts</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Upload a CSV file containing your Chart of Accounts data.</p>
+                    </div>
 
-            <div class="flex items-center gap-3">
-                <button type="button"
-                        x-show="currentStep < 7"
-                        @click="nextStep()"
-                        class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors">
-                    Next Step
-                </button>
-                <button type="submit"
-                        x-show="currentStep === 7"
-                        wire:loading.attr="disabled"
-                        class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                    <span wire:loading wire:target="submit" class="h-4 w-4 animate-spin border-2 border-white border-t-transparent rounded-full"></span>
-                    <span wire:loading.remove wire:target="submit">Create Registration</span>
-                    <span wire:loading wire:target="submit">Saving...</span>
-                </button>
+                    <div class="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-8">
+                        <div class="flex flex-col items-center justify-center space-y-4">
+                            <svg class="h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                            </svg>
+                            <div class="text-center w-full">
+                                <label for="coa_file_upload" class="cursor-pointer">
+                                    <span class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors">
+                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                        </svg>
+                                        <span x-text="uploadedFileName ? 'Change File' : 'Choose CSV File'"></span>
+                                    </span>
+                                    <input type="file"
+                                           id="coa_file_upload"
+                                           accept=".csv"
+                                           class="hidden"
+                                           @change="handleFileUpload($event)">
+                                </label>
+                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    CSV files only. Maximum file size: 5MB
+                                </p>
+
+                                <!-- Display uploaded filename -->
+                                <div x-show="uploadedFileName" class="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                    <div class="flex items-center gap-2">
+                                        <svg class="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        <div class="flex-1 min-w-0">
+                                            <p class="text-sm font-medium text-green-900 dark:text-green-100">File uploaded successfully</p>
+                                            <p class="text-xs text-green-700 dark:text-green-300 truncate" x-text="uploadedFileName"></p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Field Mapping Section -->
+                    <div x-show="csvHeaders.length > 0" class="space-y-4">
+                        <div>
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Map Fields</h4>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Map the CSV columns to the corresponding Fairpoint Books fields.</p>
+                        </div>
+
+                        <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                            <div class="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
+                                <!-- Left Column: Fairpoint Books Field -->
+                                <div class="bg-gray-50 dark:bg-gray-800/50 p-4">
+                                    <h5 class="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-4">Fairpoint Books Field</h5>
+                                    <div class="space-y-3">
+                                        <div class="flex items-center h-9">
+                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Name</span>
+                                            <span class="ml-1 text-danger-600 dark:text-danger-400">*</span>
+                                        </div>
+                                        <div class="flex items-center h-9">
+                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Subtype</span>
+                                        </div>
+                                        <div class="flex items-center h-9">
+                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Type</span>
+                                        </div>
+                                        <div class="flex items-center h-9">
+                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Subclass</span>
+                                        </div>
+                                        <div class="flex items-center h-9">
+                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Class</span>
+                                        </div>
+                                        <div class="flex items-center h-9">
+                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Normal Balance</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right Column: Imported File Headers -->
+                                <div class="bg-white dark:bg-gray-900 p-4">
+                                    <h5 class="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-4">Imported File Headers</h5>
+                                    <div class="space-y-3">
+                                        <!-- Account Name -->
+                                        <select id="coa_mapping_account_name" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                            <option value="">Select</option>
+                                        </select>
+
+                                        <!-- Account Subtype -->
+                                        <select id="coa_mapping_account_subtype" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                            <option value="">Select</option>
+                                        </select>
+
+                                        <!-- Account Type -->
+                                        <select id="coa_mapping_account_type" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                            <option value="">Select</option>
+                                        </select>
+
+                                        <!-- Account Subclass -->
+                                        <select id="coa_mapping_account_subclass" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                            <option value="">Select</option>
+                                        </select>
+
+                                        <!-- Account Class -->
+                                        <select id="coa_mapping_account_class" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                            <option value="">Select</option>
+                                        </select>
+
+                                        <!-- Normal Balance -->
+                                        <select id="coa_mapping_normal_balance" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                            <option value="">Select</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </form>
