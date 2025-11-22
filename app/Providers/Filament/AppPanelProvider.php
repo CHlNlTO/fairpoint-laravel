@@ -27,6 +27,12 @@ class AppPanelProvider extends PanelProvider
             ->id('app')
             ->path('app')
             ->login()
+            ->registration()
+            ->passwordReset()
+            ->emailVerification()
+            ->emailChangeVerification()
+            ->spa(hasPrefetching: true)
+            ->profile()
             ->colors([
                 'primary' => Color::Sky,
             ])
