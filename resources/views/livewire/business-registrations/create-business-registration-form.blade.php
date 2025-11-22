@@ -128,7 +128,8 @@
             updateSelectedCoaItems: () => this.updateSelectedCoaItems(),
             onTypeChange: (item, typeId) => this.onTypeChange(item, typeId),
             removeCoaItemRow: (index) => this.removeCoaItemRow(index),
-            addCoaItemRow: (index) => this.addCoaItemRow(index),
+            addCoaItemRow: (index, sourceItem) => this.addCoaItemRow(index, sourceItem),
+            isLastRowOfAccountType: (item, index) => this.isLastRowOfAccountType(item, index),
         };
     },
 
@@ -364,29 +365,102 @@
         }));
     },
 
-    addCoaItemRow(insertAfterIndex) {
+    isLastRowOfAccountType(item, index) {
+        // Check if this is the last row with the same account_class_id, account_subclass_id, and account_type
+        // Account type can be identified by account_type_id or account_type_name
+        if (!item.account_class_id || !item.account_subclass_id) {
+            return false;
+        }
+
+        // Need at least account_type_id or account_type_name
+        if (!item.account_type_id && !item.account_type_name) {
+            return false;
+        }
+
+        // Look ahead to see if there's another row with the same account type
+        for (let i = index + 1; i < this.coaPreview.length; i++) {
+            const nextItem = this.coaPreview[i];
+
+            // Check if class and subclass match
+            if (nextItem.account_class_id !== item.account_class_id ||
+                nextItem.account_subclass_id !== item.account_subclass_id) {
+                continue;
+            }
+
+            // Check if type matches (by ID or by name)
+            const typeMatches =
+                (item.account_type_id && nextItem.account_type_id === item.account_type_id) ||
+                (!item.account_type_id && item.account_type_name &&
+                 nextItem.account_type_name &&
+                 nextItem.account_type_name.toLowerCase().trim() === item.account_type_name.toLowerCase().trim());
+
+            if (typeMatches) {
+                return false; // Found another row with the same account type
+            }
+        }
+        return true; // This is the last row of this account type
+    },
+
+    addCoaItemRow(insertAfterIndex, sourceItem = null) {
+        // Copy hierarchy data from source item (the row where add button was clicked)
+        // Ensure all IDs are strings to match dropdown option values
         const newItem = {
             id: `new-${Date.now()}-${Math.random()}`,
             isEditable: true,
             isUserAdded: true, // Mark as user-added item
             account_code: '',
             account_name: '',
-            account_class_id: '',
-            account_class_name: '',
-            account_subclass_id: '',
-            account_subclass_name: '',
-            account_type_id: '',
-            account_type_name: '',
+            // Copy Account Class - ensure ID is string
+            account_class_id: sourceItem?.account_class_id ? String(sourceItem.account_class_id) : '',
+            account_class_name: sourceItem?.account_class_name || '',
+            // Copy Account Subclass - ensure ID is string
+            account_subclass_id: sourceItem?.account_subclass_id ? String(sourceItem.account_subclass_id) : '',
+            account_subclass_name: sourceItem?.account_subclass_name || '',
+            // Copy Account Type (can be ID or name) - ensure ID is string if present
+            account_type_id: sourceItem?.account_type_id ? String(sourceItem.account_type_id) : '',
+            account_type_name: sourceItem?.account_type_name || '',
+            // Reset subtype for new row
             account_subtype_name: '',
-            normal_balance: 'debit',
-            normal_balance_label: 'Debit',
+            // Copy normal balance
+            normal_balance: sourceItem?.normal_balance || 'debit',
+            normal_balance_label: sourceItem?.normal_balance_label || 'Debit',
         };
+
+        // Generate account code if we have the necessary hierarchy data
+        // This will automatically use the next sequential subtype number
+        if (newItem.account_class_id && newItem.account_subclass_id) {
+            newItem.account_code = this.generateAccountCodeFromItem(newItem);
+        }
 
         if (insertAfterIndex !== undefined && insertAfterIndex >= 0 && insertAfterIndex < this.coaPreview.length) {
             this.coaPreview.splice(insertAfterIndex + 1, 0, newItem);
         } else {
             this.coaPreview.push(newItem);
         }
+
+        // Ensure the names are properly set by finding them from the hierarchy data
+        // This ensures the dropdowns will show the correct selected values
+        if (newItem.account_class_id) {
+            const matchedClass = this.accountClasses.find(ac => String(ac.id) === String(newItem.account_class_id));
+            if (matchedClass) {
+                newItem.account_class_name = matchedClass.name;
+            }
+        }
+
+        if (newItem.account_subclass_id) {
+            const matchedSubclass = this.accountSubclasses.find(sc => String(sc.id) === String(newItem.account_subclass_id));
+            if (matchedSubclass) {
+                newItem.account_subclass_name = matchedSubclass.name;
+            }
+        }
+
+        if (newItem.account_type_id) {
+            const matchedType = this.accountTypes.find(at => String(at.id) === String(newItem.account_type_id));
+            if (matchedType) {
+                newItem.account_type_name = matchedType.name;
+            }
+        }
+
         this.updateSelectedCoaItems();
     },
 
@@ -436,22 +510,31 @@
         this.selectedCoaItems = this.coaPreview
             .filter(item => item.account_name && item.account_class_id && item.account_subclass_id)
             .map(item => {
+                // Ensure account code is generated and stored on the item
+                // Use the displayed account code (from item.account_code) or generate it
+                if (!item.account_code && item.account_class_id && item.account_subclass_id) {
+                    item.account_code = this.generateAccountCodeFromItem(item);
+                }
+
+                // Use the account code from the item (what's displayed in the UI)
                 const accountCode = item.account_code || this.generateAccountCodeFromItem(item);
+
                 return {
                     coa_item_id: item.id && !item.id.startsWith('new-') ? item.id : null,
-                    account_code: accountCode,
+                    account_code: accountCode, // Use the account code that's displayed in the frontend
+                    account_name: item.account_name || '', // Include account name
                     account_class: item.account_class_name || 'N/A',
                     account_subclass: item.account_subclass_name || 'N/A',
-                    account_type: item.account_type_name || item.account_type_name || 'N/A',
+                    account_type: item.account_type_name || 'N/A',
                     account_subtype: item.account_subtype_name || 'N/A',
                     normal_balance: item.normal_balance || 'debit',
                     is_active: true,
                     // Store hierarchy IDs for new items
                     account_class_id: item.account_class_id,
                     account_subclass_id: item.account_subclass_id,
-                    account_type_id: item.account_type_id,
-                    account_type_name: item.account_type_name,
-                    account_subtype_name: item.account_subtype_name,
+                    account_type_id: item.account_type_id || '',
+                    account_type_name: item.account_type_name || '',
+                    account_subtype_name: item.account_subtype_name || '',
                 };
             });
     },
@@ -463,23 +546,11 @@
 
         const classCodes = this.coaStructure.classCodes || {};
         const subclassOrders = this.coaStructure.subclassOrders || {};
-        const typeOrders = this.coaStructure.typeOrders || {};
-        const subtypeOrders = this.coaStructure.subtypeOrders || {};
 
         const classDigit = this.padNumber(classCodes[item.account_class_id] ?? 0, 1);
         const subclassDigit = this.padNumber(subclassOrders[item.account_subclass_id] ?? 1, 1);
-
-        // For type, if we have an ID, use it; otherwise, use a default of 1
-        // Note: custom typed types won't have orders, so they'll get default value
-        const typeDigits = item.account_type_id
-            ? this.padNumber(typeOrders[item.account_type_id] ?? 1, 2)
-            : this.padNumber(1, 2);
-
-        // For subtype, if we have an ID, use it; otherwise, use a default of 0
-        // Note: custom typed subtypes won't have orders, so they'll get default value
-        const subtypeDigits = item.account_subtype_id
-            ? this.padNumber(subtypeOrders[item.account_subtype_id] ?? 0, 2)
-            : this.padNumber(0, 2);
+        const typeDigits = this.padNumber(this.getTypeOrder(item), 2);
+        const subtypeDigits = this.padNumber(this.getSubtypeOrder(item), 2);
 
         return `${classDigit}${subclassDigit}${typeDigits}${subtypeDigits}`;
     },
@@ -580,6 +651,11 @@
     },
 
     generateAccountCode(item) {
+        // Handle null/undefined account_class_id gracefully
+        if (!item || !item.account_class_id) {
+            return '000000';
+        }
+
         const classCodes = this.coaStructure.classCodes || {};
         const subclassOrders = this.coaStructure.subclassOrders || {};
         const typeOrders = this.coaStructure.typeOrders || {};
@@ -596,6 +672,254 @@
         const numericValue = parseInt(value, 10);
         const safeValue = Number.isNaN(numericValue) ? 0 : numericValue;
         return String(safeValue).padStart(size, '0');
+    },
+
+    getTypeOrder(item) {
+        if (!item.account_subclass_id) {
+            return 1;
+        }
+
+        const typeOrders = this.coaStructure.typeOrders || {};
+        if (item.account_type_id && typeOrders[item.account_type_id] !== undefined) {
+            return typeOrders[item.account_type_id];
+        }
+
+        const subclassId = String(item.account_subclass_id);
+        const typeName = (item.account_type_name || '').trim().toLowerCase();
+        const baseOrder = this.getMaxTypeOrderForSubclass(subclassId);
+
+        if (!typeName) {
+            return baseOrder + 1;
+        }
+
+        const customTypeNames = this.getCustomTypeNamesForSubclass(subclassId);
+        const position = customTypeNames.indexOf(typeName);
+        const offset = position !== -1 ? position + 1 : customTypeNames.length + 1;
+        return baseOrder + offset;
+    },
+
+    getMaxTypeOrderForSubclass(subclassId) {
+        if (!subclassId) {
+            return 0;
+        }
+        const typeOrders = this.coaStructure.typeOrders || {};
+        let maxOrder = 0;
+        (this.accountTypes || []).forEach((type) => {
+            if (String(type.account_subclass_id) === String(subclassId)) {
+                const order = typeOrders[type.id] ?? 1;
+                if (order > maxOrder) {
+                    maxOrder = order;
+                }
+            }
+        });
+        return maxOrder;
+    },
+
+    getCustomTypeNamesForSubclass(subclassId) {
+        if (!subclassId) {
+            return [];
+        }
+        const typeOrders = this.coaStructure.typeOrders || {};
+        const names = [];
+        (this.coaPreview || []).forEach((row) => {
+            if (String(row.account_subclass_id) !== String(subclassId)) {
+                return;
+            }
+            const hasKnownType = row.account_type_id && typeOrders[row.account_type_id] !== undefined;
+            if (hasKnownType) {
+                return;
+            }
+            const name = (row.account_type_name || '').trim().toLowerCase();
+            if (name && !names.includes(name)) {
+                names.push(name);
+            }
+        });
+        return names;
+    },
+
+    getMaxSubtypeFromPreview(item) {
+        // Find the maximum subtype number from actual account codes in coaPreview
+        // Account code format: [class][subclass][type][subtype] = 6 digits total
+        // Subtype is the last 2 digits
+        // Returns an object with maxSubtype and foundAny flag
+        if (!item.account_class_id || !item.account_subclass_id) {
+            return { maxSubtype: -1, foundAny: false };
+        }
+
+        // Need at least type_id or type_name
+        if (!item.account_type_id && !item.account_type_name) {
+            return { maxSubtype: -1, foundAny: false };
+        }
+
+        const classCodes = this.coaStructure.classCodes || {};
+        const subclassOrders = this.coaStructure.subclassOrders || {};
+        const typeOrders = this.coaStructure.typeOrders || {};
+
+        const classDigit = this.padNumber(classCodes[item.account_class_id] ?? 0, 1);
+        const subclassDigit = this.padNumber(subclassOrders[item.account_subclass_id] ?? 1, 1);
+
+        // Get type digits - use type_id if available, otherwise calculate from type_name
+        let typeDigits;
+        if (item.account_type_id && typeOrders[item.account_type_id] !== undefined) {
+            typeDigits = this.padNumber(typeOrders[item.account_type_id], 2);
+        } else {
+            // Calculate type order from type_name
+            typeDigits = this.padNumber(this.getTypeOrder(item), 2);
+        }
+
+        // Build the prefix to match (first 4 digits: class + subclass + type)
+        const prefix = `${classDigit}${subclassDigit}${typeDigits}`;
+
+        let maxSubtype = -1;
+        let foundAny = false;
+
+        // Look through all items in coaPreview to find matching account codes
+        (this.coaPreview || []).forEach((row) => {
+            // Skip the current item
+            if (row === item || row.id === item.id) {
+                return;
+            }
+
+            // Only check items with the same class/subclass
+            if (row.account_class_id !== item.account_class_id ||
+                row.account_subclass_id !== item.account_subclass_id) {
+                return;
+            }
+
+            // Check if type matches (by ID or by name)
+            const typeMatches =
+                (item.account_type_id && row.account_type_id === item.account_type_id) ||
+                (!item.account_type_id && item.account_type_name &&
+                 row.account_type_name &&
+                 row.account_type_name.toLowerCase().trim() === item.account_type_name.toLowerCase().trim());
+
+            if (!typeMatches) {
+                return;
+            }
+
+            // Only use existing account codes to avoid recursion
+            // Don't generate codes here as that would call getSubtypeOrder which calls this function
+            const accountCode = row.account_code;
+
+            if (accountCode && accountCode.length >= 6) {
+                // Check if the prefix matches
+                if (accountCode.substring(0, 4) === prefix) {
+                    foundAny = true;
+                    // Extract the subtype (last 2 digits)
+                    const subtypeStr = accountCode.substring(4, 6);
+                    const subtypeNum = parseInt(subtypeStr, 10);
+                    if (!isNaN(subtypeNum) && subtypeNum > maxSubtype) {
+                        maxSubtype = subtypeNum;
+                    }
+                }
+            }
+        });
+
+        return { maxSubtype: foundAny ? maxSubtype : -1, foundAny };
+    },
+
+    getSubtypeOrder(item) {
+        if (!item.account_type_id && !item.account_type_name) {
+            return 0;
+        }
+
+        // Always check what's the maximum subtype number already used in the preview first
+        // This ensures sequential numbering even if database has different orders
+        const { maxSubtype, foundAny } = this.getMaxSubtypeFromPreview(item);
+
+        // If we found existing codes in preview, always use the next sequential number
+        if (foundAny && maxSubtype >= 0) {
+            // Check if item has a known subtype ID from database
+            const subtypeOrders = this.coaStructure.subtypeOrders || {};
+            if (item.account_subtype_id && subtypeOrders[item.account_subtype_id] !== undefined) {
+                const dbOrder = subtypeOrders[item.account_subtype_id];
+                // Use the higher of: database order or preview max + 1
+                // This ensures we don't go backwards, but also respect database order if it's higher
+                return Math.max(dbOrder, maxSubtype + 1);
+            }
+
+            // No database subtype ID, just use next sequential number
+            return maxSubtype + 1;
+        }
+
+        // No preview items found - start at 00 for user-added items
+        // Check if item has a known subtype ID from database
+        const subtypeOrders = this.coaStructure.subtypeOrders || {};
+        if (item.account_subtype_id && subtypeOrders[item.account_subtype_id] !== undefined) {
+            return subtypeOrders[item.account_subtype_id];
+        }
+
+        // For user-added items with no existing items, start at 00
+        const parentKey = this.getSubtypeParentKey(item);
+        const baseOrder = this.getMaxSubtypeOrderForParent(parentKey);
+        const subtypeName = (item.account_subtype_name || '').trim().toLowerCase();
+
+        if (!subtypeName) {
+            const existing = this.getCustomSubtypeNamesForParent(parentKey);
+            // Start at 00 if no existing items, otherwise continue from baseOrder
+            return foundAny ? (baseOrder + existing.length + 1) : 0;
+        }
+
+        const customNames = this.getCustomSubtypeNamesForParent(parentKey);
+        const position = customNames.indexOf(subtypeName);
+        const offset = position !== -1 ? position + 1 : customNames.length + 1;
+        // Start at 00 if no existing items, otherwise continue from baseOrder
+        return foundAny ? (baseOrder + offset) : 0;
+    },
+
+    getSubtypeParentKey(item) {
+        if (!item) {
+            return '';
+        }
+        if (item.account_type_id) {
+            return `type:${item.account_type_id}`;
+        }
+        const typeName = (item.account_type_name || '').trim().toLowerCase() || '__untyped__';
+        const subclassId = item.account_subclass_id ? String(item.account_subclass_id) : 'none';
+        return `custom:${subclassId}:${typeName}`;
+    },
+
+    getMaxSubtypeOrderForParent(parentKey) {
+        if (!parentKey) {
+            return 0;
+        }
+        const subtypeOrders = this.coaStructure.subtypeOrders || {};
+        if (parentKey.startsWith('type:')) {
+            const typeId = parentKey.slice(5);
+            let maxOrder = 0;
+            (this.accountSubtypes || []).forEach((subtype) => {
+                if (String(subtype.account_type_id) === String(typeId)) {
+                    const order = subtypeOrders[subtype.id] ?? 0;
+                    if (order > maxOrder) {
+                        maxOrder = order;
+                    }
+                }
+            });
+            return maxOrder;
+        }
+        return 0;
+    },
+
+    getCustomSubtypeNamesForParent(parentKey) {
+        if (!parentKey) {
+            return [];
+        }
+        const subtypeOrders = this.coaStructure.subtypeOrders || {};
+        const names = [];
+        (this.coaPreview || []).forEach((row) => {
+            if (this.getSubtypeParentKey(row) !== parentKey) {
+                return;
+            }
+            const hasKnownSubtype = row.account_subtype_id && subtypeOrders[row.account_subtype_id] !== undefined;
+            if (hasKnownSubtype) {
+                return;
+            }
+            const name = (row.account_subtype_name || '').trim().toLowerCase();
+            if (name && !names.includes(name)) {
+                names.push(name);
+            }
+        });
+        return names;
     },
 
     formatBalance(value) {
@@ -1085,11 +1409,11 @@
                                 <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
                                     <template x-for="(item, index) in coaPreview" :key="item.id || index">
                                         <tr class="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors" x-data="{ hovered: false, parentScope: parentScope }" @mouseenter="hovered = true" @mouseleave="hovered = false">
-                                            <!-- Plus Button (visible on hover) -->
+                                            <!-- Plus Button (visible on hover and only for last row of account type) -->
                                             <td class="px-2 py-2 w-8" style="min-width: 32px;">
                                                 <button type="button"
-                                                        @click="parentScope ? parentScope.addCoaItemRow(index) : addCoaItemRow(index)"
-                                                        :class="{ 'invisible': !hovered, 'visible': hovered }"
+                                                        @click="parentScope ? parentScope.addCoaItemRow(index, item) : addCoaItemRow(index, item)"
+                                                        :class="{ 'invisible': !hovered || !(parentScope ? parentScope.isLastRowOfAccountType(item, index) : isLastRowOfAccountType(item, index)), 'visible': hovered && (parentScope ? parentScope.isLastRowOfAccountType(item, index) : isLastRowOfAccountType(item, index)) }"
                                                         class="transition-opacity p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-primary-600 dark:text-primary-400"
                                                         title="Add row below">
                                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1114,7 +1438,7 @@
                                             <!-- Account Code -->
                                             <td class="px-2 py-2">
                                                 <span class="text-xs font-medium text-gray-900 dark:text-gray-100"
-                                                      x-text="item.account_code || (item.account_class_id && item.account_subclass_id ? generateAccountCodeFromItem(item) : '-')"></span>
+                                                      x-text="item.account_code || '-'"></span>
                                             </td>
 
                                             <!-- Account Name -->
@@ -1137,7 +1461,7 @@
                                                             class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500">
                                                         <option value="">Select class</option>
                                                         <template x-for="ac in accountClasses" :key="ac.id">
-                                                            <option :value="ac.id" x-text="ac.name"></option>
+                                                            <option :value="String(ac.id)" :selected="String(item.account_class_id) === String(ac.id)" x-text="ac.name"></option>
                                                         </template>
                                                     </select>
                                                 </template>
@@ -1155,7 +1479,7 @@
                                                             class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
                                                         <option value="">Select subclass</option>
                                                         <template x-for="sc in getAvailableSubclasses(item.account_class_id)" :key="sc.id">
-                                                            <option :value="sc.id" x-text="sc.name"></option>
+                                                            <option :value="String(sc.id)" :selected="String(item.account_subclass_id) === String(sc.id)" x-text="sc.name"></option>
                                                         </template>
                                                     </select>
                                                 </template>

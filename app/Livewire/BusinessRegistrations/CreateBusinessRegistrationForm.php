@@ -277,8 +277,9 @@ class CreateBusinessRegistrationForm extends Component
                 }
 
                 if (! empty($this->selectedCoaItems)) {
+                    // Process both system items (with coa_item_id) and user-added items (without coa_item_id)
                     $coaItems = collect($this->selectedCoaItems)
-                        ->filter(fn ($item) => filled($item['coa_item_id'] ?? null) && filled($item['account_code'] ?? null))
+                        ->filter(fn ($item) => filled($item['account_code'] ?? null))
                         ->map(function ($item) use ($businessId, $now) {
                             $normalBalance = strtolower($item['normal_balance'] ?? 'debit');
                             if (! in_array($normalBalance, ['debit', 'credit'], true)) {
@@ -288,8 +289,10 @@ class CreateBusinessRegistrationForm extends Component
                             return [
                                 'id' => (string) Str::uuid(),
                                 'business_id' => $businessId,
-                                'coa_item_id' => $item['coa_item_id'],
+                                // coa_item_id is nullable - null for user-added items, UUID for system items
+                                'coa_item_id' => filled($item['coa_item_id'] ?? null) ? $item['coa_item_id'] : null,
                                 'account_code' => $item['account_code'],
+                                'account_name' => $item['account_name'] ?? '',
                                 'account_class' => $item['account_class'] ?? 'N/A',
                                 'account_subclass' => $item['account_subclass'] ?? 'N/A',
                                 'account_type' => $item['account_type'] ?? 'N/A',
@@ -608,8 +611,8 @@ class CreateBusinessRegistrationForm extends Component
     protected function loadCoaTemplateData(): void
     {
         // OPTIMIZED: Cache COA data for 1 hour to avoid repeated DB queries
-        // Updated cache key to v4 to force refresh after removing unique constraint on account_classes.code
-        $cachedData = Cache::remember('coa_template_data_v4', 3600, function () {
+        // Updated cache key to v5 to force refresh after removing unique constraint on account_classes.code
+        $cachedData = Cache::remember('coa_template_data_v5', 3600, function () {
             // Normalize all IDs to strings for consistent client-side matching
             $classCodes = AccountClass::where('is_active', true)
                 ->orderBy('code')

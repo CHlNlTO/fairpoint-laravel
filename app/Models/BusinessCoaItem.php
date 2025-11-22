@@ -23,6 +23,7 @@ class BusinessCoaItem extends Model
         'business_id',
         'coa_item_id',
         'account_code',
+        'account_name',
         'account_class',
         'account_subclass',
         'account_type',

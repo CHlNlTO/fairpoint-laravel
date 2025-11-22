@@ -23,7 +23,7 @@ class BusinessCoaItemsRelationManager extends RelationManager
                     ->label('Account Code')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('templateItem.account_name')
+                Tables\Columns\TextColumn::make('account_name')
                     ->label('Account Name')
                     ->searchable()
                     ->sortable(),
