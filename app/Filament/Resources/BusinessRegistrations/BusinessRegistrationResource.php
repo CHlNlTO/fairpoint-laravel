@@ -15,6 +15,8 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 class BusinessRegistrationResource extends Resource
@@ -51,5 +53,16 @@ class BusinessRegistrationResource extends Resource
         return [
             BusinessCoaItemsRelationManager::class,
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        if ($user && $user->hasRole('super_admin')) {
+            return parent::getEloquentQuery();
+        }
+
+        return parent::getEloquentQuery()->where('user_id', $user->id);
     }
 }

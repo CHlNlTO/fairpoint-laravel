@@ -5,7 +5,6 @@ namespace App\Filament\Resources\BusinessRegistrations\Tables;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Actions\EditAction;
-use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
 use Filament\Actions\BulkActionGroup;
