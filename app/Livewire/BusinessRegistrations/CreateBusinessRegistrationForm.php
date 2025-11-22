@@ -608,8 +608,8 @@ class CreateBusinessRegistrationForm extends Component
     protected function loadCoaTemplateData(): void
     {
         // OPTIMIZED: Cache COA data for 1 hour to avoid repeated DB queries
-        // Updated cache key to v3 to include hierarchy data
-        $cachedData = Cache::remember('coa_template_data_v3', 3600, function () {
+        // Updated cache key to v4 to force refresh after removing unique constraint on account_classes.code
+        $cachedData = Cache::remember('coa_template_data_v4', 3600, function () {
             // Normalize all IDs to strings for consistent client-side matching
             $classCodes = AccountClass::where('is_active', true)
                 ->orderBy('code')
@@ -669,6 +669,7 @@ class CreateBusinessRegistrationForm extends Component
                 ->toArray();
 
             // Use a single efficient query with left join instead of deep eager loading
+            // Note: account_classes.code is no longer unique, but we join by ID so this is fine
             $coaItems = DB::table('coa_template_items as cti')
                 ->select([
                     'cti.id',
@@ -683,6 +684,7 @@ class CreateBusinessRegistrationForm extends Component
                     'aty.account_subclass_id',
                     'asc.name as account_subclass_name',
                     'asc.account_class_id',
+                    'acl.id as account_class_id_direct',
                     'acl.name as account_class_name',
                     'acl.code as account_class_code',
                 ])
@@ -727,6 +729,9 @@ class CreateBusinessRegistrationForm extends Component
                         ? (string) $item->account_subtype_name
                         : 'N/A';
 
+                    // Use account_class_id_direct if available, otherwise fall back to account_class_id from subclass
+                    $accountClassId = $item->account_class_id_direct ?? $item->account_class_id;
+
                     return [
                         'id' => (string) $item->id, // Normalize to string for consistent client-side matching
                         'account_name' => $item->account_name,
@@ -737,7 +742,7 @@ class CreateBusinessRegistrationForm extends Component
                         'account_subtype_id' => $item->account_subtype_id ? (string) $item->account_subtype_id : null,
                         'account_type_id' => $item->account_type_id ? (string) $item->account_type_id : null,
                         'account_subclass_id' => $item->account_subclass_id ? (string) $item->account_subclass_id : null,
-                        'account_class_id' => $item->account_class_id ? (string) $item->account_class_id : null,
+                        'account_class_id' => $accountClassId ? (string) $accountClassId : null,
                         'account_class_code' => $item->account_class_code ? (string) $item->account_class_code : null,
                         'normal_balance' => $item->normal_balance ?? 'debit',
                         'normal_balance_label' => ucfirst($item->normal_balance ?? 'debit'),
