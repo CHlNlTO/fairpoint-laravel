@@ -7,7 +7,7 @@
 <div class="min-h-screen bg-gradient-to-b from-gray-50 to-white dark:from-slate-900 dark:to-slate-950">
 
     {{-- Hero Section --}}
-    <section class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 py-16">
+    <section class="bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 py-16">
         <div class="max-w-7xl mx-auto px-6 text-center">
             <h1 class="text-4xl md:text-5xl font-bold text-slate-900 dark:text-white mb-4">
                 Get in Touch

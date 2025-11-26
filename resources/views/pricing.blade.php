@@ -6,12 +6,12 @@
 <div class="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-900 dark:to-slate-950">
 
     {{-- Hero Section --}}
-    <section class="pt-20 pb-16 px-6">
+    <section class="px-6 pt-20 pb-16">
         <div class="max-w-4xl mx-auto text-center">
-            <h1 class="text-5xl font-bold text-slate-900 dark:text-white mb-6">
+            <h1 class="mb-6 text-5xl font-bold text-slate-900 dark:text-white">
                 Simple, Transparent Pricing
             </h1>
-            <p class="text-xl text-slate-600 dark:text-slate-300 mb-8 max-w-2xl mx-auto">
+            <p class="max-w-2xl mx-auto mb-8 text-xl text-slate-600 dark:text-slate-300">
                 Choose the perfect plan for your business needs. All plans include our core accounting features and BIR compliance tools, with Philippine tax automation.
             </p>
             <p class="text-sm text-slate-500 dark:text-slate-400">
@@ -21,9 +21,9 @@
     </section>
 
     {{-- Billing Toggle - NO route() = NO ERRORS --}}
-    <div class="max-w-7xl mx-auto px-6 mb-12">
+    <div class="px-6 mx-auto mb-12 max-w-7xl">
         <div class="flex justify-center">
-            <div class="bg-white dark:bg-slate-800 rounded-lg shadow-md p-1 inline-flex">
+            <div class="inline-flex p-1 bg-white rounded-lg shadow-md dark:bg-slate-800">
                 <a href="/pricing"
                    class="px-8 py-3 rounded-md font-medium transition-all {{ request('period') !== 'yearly' ? 'bg-primary text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700' }}">
                     Monthly
@@ -94,50 +94,50 @@
     @endphp
 
     {{-- Pricing Plans --}}
-    <section class="py-12 px-6">
-        <div class="max-w-7xl mx-auto">
-            <div class="grid lg:grid-cols-3 gap-8">
+    <section class="px-6 py-12">
+        <div class="mx-auto max-w-7xl">
+            <div class="grid gap-8 lg:grid-cols-3">
                 @foreach($plans as $plan)
                     @php
                         $price = $isYearly ? $plan['yearly'] : $plan['monthly'];
                         $savings = ($plan['monthly'] * 12) - $plan['yearly'];
                     @endphp
 
-                    <div class="relative {{ $plan['popular'] ? 'ring-4 ring-primary/30 scale-105' : '' }} transition-all">
+                    <div class="relative {{ $plan['popular'] ? 'scale-105' : '' }} transition-all">
                         @if($plan['popular'])
-                            <div class="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-                                <span class="bg-primary text-white text-xs font-bold px-4 py-1 rounded-full shadow-lg">
+                            <div class="absolute z-10 -translate-x-1/2 -top-4 left-1/2">
+                                <span class="px-4 py-1 text-xs font-bold text-white rounded-full shadow-lg bg-primary">
                                     Most Popular
                                 </span>
                             </div>
                         @endif
 
-                        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-slate-200 dark:border-slate-700 p-8 h-full flex flex-col">
-                            <div class="text-center mb-6">
+                        <div class="flex flex-col h-full p-8 bg-white border shadow-xl dark:bg-slate-800 rounded-2xl border-slate-200 dark:border-slate-700">
+                            <div class="mb-6 text-center">
                                 <h3 class="text-2xl font-bold text-slate-900 dark:text-white">{{ $plan['name'] }}</h3>
-                                <p class="text-slate-600 dark:text-slate-400 mt-2">{{ $plan['description'] }}</p>
+                                <p class="mt-2 text-slate-600 dark:text-slate-400">{{ $plan['description'] }}</p>
                             </div>
 
-                            <div class="text-center mb-8">
+                            <div class="mb-8 text-center">
                                 <span class="text-4xl font-bold text-slate-900 dark:text-white">
                                     ₱{{ number_format($price) }}
                                 </span>
                                 <span class="text-lg font-normal text-slate-500">/{{ $isYearly ? 'year' : 'month' }}</span>
 
                                 @if($isYearly && $savings > 0)
-                                    <p class="text-green-600 dark:text-green-400 text-sm mt-2">
+                                    <p class="mt-2 text-sm text-green-600 dark:text-green-400">
                                         Save ₱{{ number_format($savings) }} per year
                                     </p>
                                 @endif
                             </div>
 
-                            <ul class="space-y-4 flex-1 mb-8">
+                            <ul class="flex-1 mb-8 space-y-4">
                                 @foreach($plan['features'] as $feature)
                                     <li class="flex items-start gap-3">
                                         <svg class="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
                                         </svg>
-                                        <span class="text-slate-600 dark:text-slate-300 text-sm">{{ $feature }}</span>
+                                        <span class="text-sm text-slate-600 dark:text-slate-300">{{ $feature }}</span>
                                     </li>
                                 @endforeach
                             </ul>
@@ -145,8 +145,8 @@
                             {{-- NO route('register') → NO ERROR --}}
                             <a href="/register"
                                class="w-full text-center py-3 px-6 rounded-lg font-semibold transition-all
-                                      {{ $plan['popular'] 
-                                         ? 'bg-primary text-white hover:bg-[#2BA3E6] shadow-lg' 
+                                      {{ $plan['popular']
+                                         ? 'bg-primary text-white hover:bg-[#2BA3E6] shadow-lg'
                                          : 'border-2 border-primary text-primary hover:bg-primary hover:text-white' }}">
                                 Choose {{ Str::after($plan['name'], ' ') }}
                             </a>
@@ -158,10 +158,10 @@
     </section>
 
     {{-- Consulting Services --}}
-    <section class="py-20 px-6 bg-white dark:bg-slate-800">
-        <div class="max-w-7xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold text-slate-900 dark:text-white mb-4">
+    <section class="px-6 py-20 bg-white dark:bg-slate-800">
+        <div class="mx-auto max-w-7xl">
+            <div class="mb-16 text-center">
+                <h2 class="mb-4 text-4xl font-bold text-slate-900 dark:text-white">
                     Consulting Services
                 </h2>
                 <p class="text-xl text-slate-600 dark:text-slate-300">
@@ -169,7 +169,7 @@
                 </p>
             </div>
 
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
                 @foreach([
                     ['title' => 'BIR Registration Setup', 'price' => '₱5,000'],
                     ['title' => 'Tax Compliance Audit', 'price' => '₱15,000'],
@@ -179,23 +179,23 @@
                     ['title' => 'Annual Tax Filing', 'price' => '₱6,000'],
                 ] as $service)
                     <div class="bg-gradient-to-br from-[#38B6FF] to-[#2563eb] rounded-2xl p-6 shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 text-white">
-                        <p class="text-white/80 text-lg mb-6">Consult with</p>
+                        <p class="mb-6 text-lg text-white/80">Consult with</p>
 
-                        <div class="bg-white/20 backdrop-blur rounded-xl p-6 mb-6 flex items-center justify-center h-32">
-                            <div class="w-20 h-20 bg-white/30 rounded-full flex items-center justify-center">
+                        <div class="flex items-center justify-center h-32 p-6 mb-6 bg-white/20 backdrop-blur rounded-xl">
+                            <div class="flex items-center justify-center w-20 h-20 rounded-full bg-white/30">
                                 <svg class="w-12 h-12 text-white/70" fill="currentColor" viewBox="0 0 24 24">
                                     <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                                 </svg>
                             </div>
                         </div>
 
-                        <div class="bg-white rounded-xl p-5">
-                            <p class="text-gray-600 text-sm mb-1">Service</p>
-                            <h4 class="text-lg font-bold text-gray-900 mb-3">{{ $service['title'] }}</h4>
+                        <div class="p-5 bg-white rounded-xl">
+                            <p class="mb-1 text-sm text-gray-600">Service</p>
+                            <h4 class="mb-3 text-lg font-bold text-gray-900">{{ $service['title'] }}</h4>
                             <p class="text-2xl font-bold text-gray-900">{{ $service['price'] }}</p>
                         </div>
 
-                        <a href="/contact" class="block w-full text-center mt-6 bg-white text-primary font-bold py-3 rounded-xl hover:bg-primary hover:text-white transition-all shadow-lg">
+                        <a href="/contact" class="block w-full py-3 mt-6 font-bold text-center transition-all bg-white shadow-lg text-primary rounded-xl hover:bg-primary hover:text-white">
                             Book Consultation
                         </a>
                     </div>
@@ -205,10 +205,10 @@
     </section>
 
     {{-- FAQ Section --}}
-    <section class="py-20 px-6">
+    <section class="px-6 py-20">
         <div class="max-w-4xl mx-auto">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl font-bold text-slate-900 dark:text-white mb-4">
+            <div class="mb-16 text-center">
+                <h2 class="mb-4 text-4xl font-bold text-slate-900 dark:text-white">
                     Frequently Asked Questions
                 </h2>
             </div>
@@ -221,10 +221,10 @@
                     ['q' => 'Do you offer refunds?', 'a' => 'We offer a 30-day money-back guarantee.'],
                     ['q' => "What's included in the consultation?", 'a' => 'Personalized guidance from certified Filipino accountants who know BIR rules inside out.'],
                 ] as $faq)
-                    <details class="group bg-white dark:bg-slate-800 rounded-xl shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden">
-                        <summary class="list-none px-8 py-6 cursor-pointer font-medium text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex justify-between items-center">
+                    <details class="overflow-hidden bg-white border shadow-md group dark:bg-slate-800 rounded-xl border-slate-200 dark:border-slate-700">
+                        <summary class="flex items-center justify-between px-8 py-6 font-medium list-none transition-colors cursor-pointer text-slate-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-700/50">
                             <span>{{ $faq['q'] }}</span>
-                            <svg class="w-5 h-5 text-slate-500 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg class="w-5 h-5 transition-transform text-slate-500 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                             </svg>
                         </summary>

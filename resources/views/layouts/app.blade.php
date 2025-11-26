@@ -1,29 +1,39 @@
 {{-- resources/views/layouts/app.blade.php --}}
 <!DOCTYPE html>
 <html lang="en" class="scroll-smooth">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Fairpoint')</title>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>@yield('title', 'Fairpoint')</title>
 
-    @filamentStyles
-    @livewireStyles
-    @vite(['resources/css/app.css'])
-</head>
-<body class="antialiased bg-gray-50 dark:bg-slate-900">
+        <script>
+            // Apply dark mode immediately before page renders to prevent flash
+            (function() {
+                const isDark = localStorage.getItem('dark') === 'true';
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                }
+            })();
+        </script>
 
-    @include('partials.header')
+        @filamentStyles
+        @livewireStyles
+        @vite(['resources/css/app.css'])
+    </head>
+    <body class="font-sans antialiased bg-gray-50 dark:bg-slate-900">
 
-    <main class="min-h-screen">
-        @yield('content')
-    </main>
+        @include('partials.header')
 
-    <footer class="bg-white dark:bg-slate-800 border-t py-8 text-center text-sm text-gray-600">
-        © {{ date('Y') }} Fairpoint. All rights reserved.
-    </footer>
+        <main class="min-h-screen">
+            @yield('content')
+        </main>
 
-    @livewireScripts
-    @filamentScripts
-    @vite(['resources/js/app.js'])
-</body>
+        <footer class="py-8 text-sm text-center text-gray-600 bg-white border-t dark:bg-slate-800">
+            © {{ date('Y') }} Fairpoint. All rights reserved.
+        </footer>
+
+        @livewireScripts
+        @filamentScripts
+        @vite(['resources/js/app.js'])
+    </body>
 </html>
