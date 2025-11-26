@@ -72,4 +72,29 @@ class BusinessRegistration extends Model
     {
         return $this->hasMany(BusinessGovernmentRegistration::class);
     }
+
+    public function region()
+    {
+        return $this->belongsTo(\Yajra\Address\Entities\Region::class, 'region_id');
+    }
+
+    public function province()
+    {
+        return $this->belongsTo(\Yajra\Address\Entities\Province::class, 'province_id');
+    }
+
+    public function city()
+    {
+        return $this->belongsTo(\Yajra\Address\Entities\City::class, 'city_id');
+    }
+
+    public function barangay()
+    {
+        return $this->belongsTo(\Yajra\Address\Entities\Barangay::class, 'barangay_id');
+    }
+
+    public function coaItems()
+    {
+        return $this->hasMany(BusinessCoaItem::class, 'business_id');
+    }
 }

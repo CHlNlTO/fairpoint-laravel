@@ -13,11 +13,18 @@ use App\Models\COAItemTaxType;
 use App\Models\COATemplateItem;
 use App\Models\IndustryType;
 use App\Models\TaxType;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 
 class CreateCOAItems extends Component
 {
+    use WithFileUploads;
+
     public $items = [];
+    public $csvFile;
+    public string $mode = 'create';
+    public array $ignoreCoaItemIds = [];
 
     // Hierarchy data loaded once
     public $accountClasses = [];
@@ -32,22 +39,6 @@ class CreateCOAItems extends Component
     {
         // Load all hierarchy data once
         $this->loadHierarchyData();
-
-        // Initialize with 1 empty item
-        $this->items = [[
-            'account_code' => '',
-            'account_name' => '',
-            'account_class_id' => '',
-            'account_subclass_id' => '',
-            'account_type_id' => '',
-            'account_subtype_id' => '',
-            'normal_balance' => 'debit',
-            'is_active' => true,
-            'is_default' => true,
-            'business_type_ids' => [],
-            'industry_type_ids' => [],
-            'tax_type_ids' => [],
-        ]];
     }
 
     public function loadHierarchyData()
@@ -66,44 +57,40 @@ class CreateCOAItems extends Component
             ->toArray();
 
         $this->accountSubclasses = AccountSubclass::where('is_active', true)
-            ->orderBy('code')
+            ->orderBy('name')
             ->get()
             ->map(function ($subclass) {
                 return [
                     'id' => $subclass->id,
                     'account_class_id' => $subclass->account_class_id,
-                    'code' => $subclass->code,
                     'name' => $subclass->name,
+                    'sort_order' => $subclass->sort_order ?? 1,
                 ];
             })
             ->toArray();
 
         $this->accountTypes = AccountType::where('is_active', true)
-            ->orderBy('code')
+            ->orderBy('name')
             ->get()
             ->map(function ($type) {
                 return [
                     'id' => $type->id,
                     'account_subclass_id' => $type->account_subclass_id,
-                    'code' => $type->code,
                     'name' => $type->name,
+                    'sort_order' => $type->sort_order ?? 1,
                 ];
             })
             ->toArray();
 
-        $this->accountSubtypes = AccountSubtype::with(['accountType.accountSubclass.accountClass'])
-            ->where('is_active', true)
-            ->orderBy('code')
+        $this->accountSubtypes = AccountSubtype::where('is_active', true)
+            ->orderBy('name')
             ->get()
             ->map(function ($subtype) {
                 return [
                     'id' => $subtype->id,
                     'account_type_id' => $subtype->account_type_id,
-                    'code' => $subtype->code,
                     'name' => $subtype->name,
-                    'class_code' => $subtype->accountType->accountSubclass->accountClass->code,
-                    'subclass_code' => $subtype->accountType->accountSubclass->code,
-                    'type_code' => $subtype->accountType->code,
+                    'sort_order' => $subtype->sort_order ?? 0,
                 ];
             })
             ->toArray();
@@ -142,77 +129,632 @@ class CreateCOAItems extends Component
             ->toArray();
     }
 
-    public function generateAccountCode($index)
+
+    public function downloadTemplate()
     {
-        if (!isset($this->items[$index]['account_subtype_id']) || !$this->items[$index]['account_subtype_id']) {
-            $this->items[$index]['account_code'] = '';
-            return;
-        }
+        $headers = [
+            'Account Name',
+            'Account Class',
+            'Account Subclass Sort Order',
+            'Account Subclass',
+            'Account Type Sort Order',
+            'Account Type',
+            'Account Subtype Sort Order',
+            'Account Subtype',
+            'Normal Balance',
+            'Tax Type',
+            'Industry Type',
+            'Business Type',
+            'Is Default'
+        ];
 
-        $subtypeId = $this->items[$index]['account_subtype_id'];
-        $subtype = collect($this->accountSubtypes)->firstWhere('id', $subtypeId);
+        $filename = 'coa_template_' . date('Y-m-d') . '.csv';
+        $file = fopen('php://temp', 'r+');
 
-        if (!$subtype) {
-            return;
-        }
+        // Write BOM for UTF-8
+        fwrite($file, "\xEF\xBB\xBF");
 
-        // Generate base code
-        $classCode = str_pad((string)$subtype['class_code'], 1, '0', STR_PAD_LEFT);
-        $subclassCode = str_pad((string)$subtype['subclass_code'], 1, '0', STR_PAD_LEFT);
-        $typeCode = str_pad((string)$subtype['type_code'], 2, '0', STR_PAD_LEFT);
+        // Write headers
+        fputcsv($file, $headers);
 
-        // Get existing codes from database and current form
-        $existingCodes = COATemplateItem::where('account_subtype_id', $subtypeId)
-            ->pluck('account_code')
-            ->toArray();
+        // Write example row
+        fputcsv($file, [
+            'Petty Cash Fund',
+            'Assets',
+            '1',
+            'Current Assets',
+            '1',
+            'Cash and Cash Equivalents',
+            '0',
+            'Petty Cash Fund',
+            'Debit',
+            'Any',
+            'Gen',
+            'Any',
+            'Yes'
+        ]);
 
-        // Also check codes from current form items
-        foreach ($this->items as $item) {
-            if (isset($item['account_code']) && $item['account_code'] && $item['account_subtype_id'] === $subtypeId) {
-                $existingCodes[] = $item['account_code'];
-            }
-        }
+        rewind($file);
+        $csv = stream_get_contents($file);
+        fclose($file);
 
-        // Find highest last two digits
-        $highestCode = 0;
-        foreach ($existingCodes as $code) {
-            if (strlen($code) < 2) continue;
-            $lastTwo = substr($code, -2);
-            if (is_numeric($lastTwo) && (int)$lastTwo > $highestCode) {
-                $highestCode = (int)$lastTwo;
-            }
-        }
-
-        $nextSubtypeCode = str_pad($highestCode + 1, 2, '0', STR_PAD_LEFT);
-
-        $this->items[$index]['account_code'] = $classCode . $subclassCode . $typeCode . $nextSubtypeCode;
+        return response()->streamDownload(function () use ($csv) {
+            echo $csv;
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
     }
+
+    public function processCsv()
+    {
+        $this->validate([
+            'csvFile' => 'required|file|mimes:csv,txt|max:10240', // 10MB max
+        ]);
+
+        $path = $this->csvFile->getRealPath();
+        $file = fopen($path, 'r');
+
+        // Skip BOM if present
+        $bom = fread($file, 3);
+        if ($bom !== "\xEF\xBB\xBF") {
+            rewind($file);
+        }
+
+        // Read and validate header
+        $header = fgetcsv($file);
+        $expectedHeaders = [
+            'Account Name',
+            'Account Class',
+            'Account Subclass Sort Order',
+            'Account Subclass',
+            'Account Type Sort Order',
+            'Account Type',
+            'Account Subtype Sort Order',
+            'Account Subtype',
+            'Normal Balance',
+            'Tax Type',
+            'Industry Type',
+            'Business Type',
+            'Is Default'
+        ];
+
+        if ($header !== $expectedHeaders) {
+            fclose($file);
+            $this->addError('csvFile', 'Invalid CSV format. Please download the template and use it.');
+            return;
+        }
+
+        $parsedItems = [];
+        $rowNumber = 1;
+
+        while (($row = fgetcsv($file)) !== false) {
+            $rowNumber++;
+
+            // Skip empty rows
+            if (empty(array_filter($row))) {
+                continue;
+            }
+
+            if (count($row) !== 13) {
+                continue; // Skip invalid rows
+            }
+
+            // Map CSV row to item structure
+            // Column indices: 0=Name, 1=Class, 2=Subclass Sort, 3=Subclass, 4=Type Sort, 5=Type, 6=Subtype Sort, 7=Subtype, 8=Balance, 9=Tax, 10=Industry, 11=Business, 12=Default
+            $item = [
+                'account_name' => trim($row[0]) ?: '',
+                'account_class_name' => trim($row[1]) ?: '', // Store name for matching
+                'account_subclass_sort_order' => !empty(trim($row[2])) ? (int)trim($row[2]) : 1,
+                'account_subclass_name' => trim($row[3]) ?: '',
+                'account_type_sort_order' => !empty(trim($row[4])) ? (int)trim($row[4]) : 1,
+                'account_type_name' => trim($row[5]) ?: '',
+                'account_subtype_sort_order' => !empty(trim($row[6])) ? (int)trim($row[6]) : 0,
+                'account_subtype_name' => trim($row[7]) ?: '',
+                'normal_balance' => strtolower(trim($row[8])) === 'credit' ? 'credit' : 'debit',
+                'tax_type_name' => trim($row[9]) ?: '',
+                'industry_type_name' => trim($row[10]) ?: '',
+                'business_type_name' => trim($row[11]) ?: '',
+                // Initialize IDs (will be set during matching)
+                'account_class_id' => '',
+                'account_subclass_id' => '',
+                'account_type_id' => '',
+                'account_subtype_id' => '',
+                'is_active' => true,
+                'is_default' => strtolower(trim($row[12])) === 'yes',
+                'business_type_ids' => [],
+                'industry_type_ids' => [],
+                'tax_type_ids' => [],
+                // Flags to track if record needs to be created
+                'needs_class_creation' => false,
+                'needs_subclass_creation' => false,
+                'needs_type_creation' => false,
+                'needs_subtype_creation' => false,
+            ];
+
+            // Match existing records
+            $this->matchHierarchyRecords($item);
+
+            // Match type records (Tax, Industry, Business)
+            $this->matchTypeRecords($item);
+
+            Log::debug('CSV row processed', [
+                'row_number' => $rowNumber,
+                'account_name' => $item['account_name'],
+                'account_class_name' => $item['account_class_name'],
+                'account_class_id' => $item['account_class_id'],
+                'account_subclass_name' => $item['account_subclass_name'],
+                'account_subclass_id' => $item['account_subclass_id'],
+                'account_type_name' => $item['account_type_name'],
+                'account_type_id' => $item['account_type_id'],
+                'account_subtype_name' => $item['account_subtype_name'],
+                'account_subtype_id' => $item['account_subtype_id'],
+            ]);
+
+            $parsedItems[] = $item;
+        }
+
+        fclose($file);
+
+        // Log existing items before clearing (for debugging)
+        Log::info('Items before CSV import', [
+            'existing_items_count' => count($this->items),
+            'first_item' => !empty($this->items[0]) ? [
+                'account_name' => $this->items[0]['account_name'] ?? 'N/A',
+                'account_class_id' => $this->items[0]['account_class_id'] ?? 'N/A',
+            ] : 'No items',
+        ]);
+
+        // CLEAR ALL existing items first (clean slate)
+        $this->items = [];
+
+        // Replace with parsed items from CSV
+        $this->items = $parsedItems;
+
+        Log::info('CSV import completed', [
+            'total_rows' => count($parsedItems),
+            'first_item_after_import' => !empty($parsedItems[0]) ? [
+                'account_name' => $parsedItems[0]['account_name'] ?? 'N/A',
+                'account_class_id' => $parsedItems[0]['account_class_id'] ?? 'N/A',
+                'account_subtype_id' => $parsedItems[0]['account_subtype_id'] ?? 'N/A',
+            ] : 'No items',
+        ]);
+
+        session()->flash('success', count($parsedItems) . ' items imported from CSV successfully.');
+        $this->csvFile = null; // Clear the file input
+    }
+
+    protected function matchHierarchyRecords(&$item)
+    {
+        // Match Account Class
+        if ($item['account_class_name']) {
+            $matched = collect($this->accountClasses)->firstWhere('name', $item['account_class_name']);
+            if ($matched) {
+                $item['account_class_id'] = $matched['id'];
+            } else {
+                $item['needs_class_creation'] = true;
+            }
+        }
+
+        // Match Account Subclass (only if class is matched or will be created)
+        if ($item['account_subclass_name'] && ($item['account_class_id'] || ($item['needs_class_creation'] ?? false))) {
+            $classId = $item['account_class_id'];
+            $matched = collect($this->accountSubclasses)->first(function ($subclass) use ($item, $classId) {
+                return $subclass['name'] === $item['account_subclass_name'] &&
+                       ($classId ? $subclass['account_class_id'] === $classId : true);
+            });
+
+            if ($matched) {
+                $item['account_subclass_id'] = $matched['id'];
+            } else {
+                $item['needs_subclass_creation'] = true;
+            }
+        }
+
+        // Match Account Type
+        if ($item['account_type_name'] && ($item['account_subclass_id'] || ($item['needs_subclass_creation'] ?? false))) {
+            $subclassId = $item['account_subclass_id'];
+            $matched = collect($this->accountTypes)->first(function ($type) use ($item, $subclassId) {
+                return $type['name'] === $item['account_type_name'] &&
+                       ($subclassId ? $type['account_subclass_id'] === $subclassId : true);
+            });
+
+            if ($matched) {
+                $item['account_type_id'] = $matched['id'];
+            } else {
+                $item['needs_type_creation'] = true;
+            }
+        }
+
+        // Match Account Subtype
+        if ($item['account_subtype_name'] && ($item['account_type_id'] || ($item['needs_type_creation'] ?? false))) {
+            $typeId = $item['account_type_id'];
+            $matched = collect($this->accountSubtypes)->first(function ($subtype) use ($item, $typeId) {
+                return $subtype['name'] === $item['account_subtype_name'] &&
+                       ($typeId ? $subtype['account_type_id'] === $typeId : true);
+            });
+
+            if ($matched) {
+                $item['account_subtype_id'] = $matched['id'];
+            } else {
+                $item['needs_subtype_creation'] = true;
+            }
+        }
+    }
+
+    protected function matchTypeRecords(&$item)
+    {
+        // Handle Tax Type, Industry Type, Business Type
+        // They are mutually exclusive - only one category can have selections
+
+        $taxTypeName = trim($item['tax_type_name'] ?? '');
+        $industryTypeName = trim($item['industry_type_name'] ?? '');
+        $businessTypeName = trim($item['business_type_name'] ?? '');
+
+        // Handle "Any" special value - skip matching
+        if (strtolower($taxTypeName) === 'any') $taxTypeName = '';
+        if (strtolower($industryTypeName) === 'any') $industryTypeName = '';
+        if (strtolower($businessTypeName) === 'any') $businessTypeName = '';
+
+        // Determine which category has data (take first non-empty)
+        if ($taxTypeName) {
+            // Parse comma-separated values
+            $taxTypeNames = array_map('trim', explode(',', $taxTypeName));
+            $matchedIds = [];
+            foreach ($taxTypeNames as $name) {
+                $matched = collect($this->taxTypes)->firstWhere('name', $name);
+                if ($matched) {
+                    $matchedIds[] = $matched['id'];
+                }
+            }
+            if (!empty($matchedIds)) {
+                $item['tax_type_ids'] = $matchedIds;
+            }
+        } elseif ($industryTypeName) {
+            // Parse comma-separated values
+            $industryTypeNames = array_map('trim', explode(',', $industryTypeName));
+            $matchedIds = [];
+            foreach ($industryTypeNames as $name) {
+                $matched = collect($this->industryTypes)->firstWhere('name', $name);
+                if ($matched) {
+                    $matchedIds[] = $matched['id'];
+                }
+            }
+            if (!empty($matchedIds)) {
+                $item['industry_type_ids'] = $matchedIds;
+            }
+        } elseif ($businessTypeName) {
+            // Parse comma-separated values
+            $businessTypeNames = array_map('trim', explode(',', $businessTypeName));
+            $matchedIds = [];
+            foreach ($businessTypeNames as $name) {
+                $matched = collect($this->businessTypes)->firstWhere('name', $name);
+                if ($matched) {
+                    $matchedIds[] = $matched['id'];
+                }
+            }
+            if (!empty($matchedIds)) {
+                $item['business_type_ids'] = $matchedIds;
+            }
+        }
+    }
+
+
+    protected function createOrGetAccountClass($name, $normalBalance)
+    {
+        // Check if already exists in loaded data
+        $existing = collect($this->accountClasses)->firstWhere('name', $name);
+        if ($existing) {
+            return $existing['id'];
+        }
+
+        // Check database
+        $accountClass = AccountClass::where('name', $name)->first();
+        if ($accountClass) {
+            // Add to loaded data
+            $this->accountClasses[] = [
+                'id' => $accountClass->id,
+                'code' => $accountClass->code,
+                'name' => $accountClass->name,
+            ];
+            return $accountClass->id;
+        }
+
+        // Create new
+        $code = $this->getNextAccountClassCode();
+        $accountClass = AccountClass::create([
+            'code' => $code,
+            'name' => $name,
+            'normal_balance' => $normalBalance,
+            'is_active' => true,
+        ]);
+
+        // Add to loaded data
+        $this->accountClasses[] = [
+            'id' => $accountClass->id,
+            'code' => $accountClass->code,
+            'name' => $accountClass->name,
+        ];
+
+        return $accountClass->id;
+    }
+
+    protected function createOrGetAccountSubclass($name, $accountClassId, $sortOrder = 1)
+    {
+        // Check if already exists in loaded data
+        $existing = collect($this->accountSubclasses)->first(function ($subclass) use ($name, $accountClassId) {
+            return $subclass['name'] === $name && $subclass['account_class_id'] === $accountClassId;
+        });
+        if ($existing) {
+            // Update sort_order if provided and different
+            $existingSortOrder = $existing['sort_order'] ?? 1;
+            if ($sortOrder && $sortOrder !== $existingSortOrder) {
+                AccountSubclass::where('id', $existing['id'])->update(['sort_order' => $sortOrder]);
+                $existing['sort_order'] = $sortOrder;
+            }
+            return $existing['id'];
+        }
+
+        // Check database
+        $accountSubclass = AccountSubclass::where('name', $name)
+            ->where('account_class_id', $accountClassId)
+            ->first();
+        if ($accountSubclass) {
+            // Update sort_order if provided and different
+            if ($sortOrder && $accountSubclass->sort_order !== $sortOrder) {
+                $accountSubclass->update(['sort_order' => $sortOrder]);
+            }
+            // Add to loaded data
+            $this->accountSubclasses[] = [
+                'id' => $accountSubclass->id,
+                'account_class_id' => $accountSubclass->account_class_id,
+                'name' => $accountSubclass->name,
+                'sort_order' => $accountSubclass->sort_order ?? 1,
+            ];
+            return $accountSubclass->id;
+        }
+
+        // Create new
+        $accountSubclass = AccountSubclass::create([
+            'account_class_id' => $accountClassId,
+            'name' => $name,
+            'sort_order' => $sortOrder ?? 1,
+            'is_active' => true,
+        ]);
+
+        // Add to loaded data
+        $this->accountSubclasses[] = [
+            'id' => $accountSubclass->id,
+            'account_class_id' => $accountSubclass->account_class_id,
+            'name' => $accountSubclass->name,
+            'sort_order' => $accountSubclass->sort_order ?? 1,
+        ];
+
+        return $accountSubclass->id;
+    }
+
+    protected function createOrGetAccountType($name, $accountSubclassId, $sortOrder = 1)
+    {
+        // Check if already exists in loaded data
+        $existing = collect($this->accountTypes)->first(function ($type) use ($name, $accountSubclassId) {
+            return $type['name'] === $name && $type['account_subclass_id'] === $accountSubclassId;
+        });
+        if ($existing) {
+            // Update sort_order if provided and different
+            $existingSortOrder = $existing['sort_order'] ?? 1;
+            if ($sortOrder && $sortOrder !== $existingSortOrder) {
+                AccountType::where('id', $existing['id'])->update(['sort_order' => $sortOrder]);
+                $existing['sort_order'] = $sortOrder;
+            }
+            return $existing['id'];
+        }
+
+        // Check database
+        $accountType = AccountType::where('name', $name)
+            ->where('account_subclass_id', $accountSubclassId)
+            ->first();
+        if ($accountType) {
+            // Update sort_order if provided and different
+            if ($sortOrder && $accountType->sort_order !== $sortOrder) {
+                $accountType->update(['sort_order' => $sortOrder]);
+            }
+            // Add to loaded data
+            $this->accountTypes[] = [
+                'id' => $accountType->id,
+                'account_subclass_id' => $accountType->account_subclass_id,
+                'name' => $accountType->name,
+                'sort_order' => $accountType->sort_order ?? 1,
+            ];
+            return $accountType->id;
+        }
+
+        // Create new
+        $accountType = AccountType::create([
+            'account_subclass_id' => $accountSubclassId,
+            'name' => $name,
+            'sort_order' => $sortOrder ?? 1,
+            'is_active' => true,
+            'is_system_defined' => true,
+        ]);
+
+        // Add to loaded data
+        $this->accountTypes[] = [
+            'id' => $accountType->id,
+            'account_subclass_id' => $accountType->account_subclass_id,
+            'name' => $accountType->name,
+            'sort_order' => $accountType->sort_order ?? 1,
+        ];
+
+        return $accountType->id;
+    }
+
+    protected function createOrGetAccountSubtype($name, $accountTypeId, $sortOrder = 0)
+    {
+        // Check if already exists in loaded data
+        $existing = collect($this->accountSubtypes)->first(function ($subtype) use ($name, $accountTypeId) {
+            return $subtype['name'] === $name && $subtype['account_type_id'] === $accountTypeId;
+        });
+        if ($existing) {
+            // Update sort_order if provided and different
+            $existingSortOrder = $existing['sort_order'] ?? 0;
+            if ($sortOrder !== null && $sortOrder !== $existingSortOrder) {
+                AccountSubtype::where('id', $existing['id'])->update(['sort_order' => $sortOrder]);
+                $existing['sort_order'] = $sortOrder;
+            }
+            return $existing['id'];
+        }
+
+        // Check database
+        $accountSubtype = AccountSubtype::where('name', $name)
+            ->where('account_type_id', $accountTypeId)
+            ->first();
+        if ($accountSubtype) {
+            // Update sort_order if provided and different
+            if ($sortOrder !== null && $accountSubtype->sort_order !== $sortOrder) {
+                $accountSubtype->update(['sort_order' => $sortOrder]);
+            }
+            // Add to loaded data
+            $this->accountSubtypes[] = [
+                'id' => $accountSubtype->id,
+                'account_type_id' => $accountSubtype->account_type_id,
+                'name' => $accountSubtype->name,
+                'sort_order' => $accountSubtype->sort_order ?? 0,
+            ];
+            return $accountSubtype->id;
+        }
+
+        // Create new
+        $accountSubtype = AccountSubtype::create([
+            'account_type_id' => $accountTypeId,
+            'name' => $name,
+            'sort_order' => $sortOrder ?? 0,
+            'is_active' => true,
+            'is_system_defined' => true,
+        ]);
+
+        // Add to loaded data
+        $this->accountSubtypes[] = [
+            'id' => $accountSubtype->id,
+            'account_type_id' => $accountSubtype->account_type_id,
+            'name' => $accountSubtype->name,
+            'sort_order' => $accountSubtype->sort_order ?? 0,
+        ];
+
+        return $accountSubtype->id;
+    }
+
 
     public function save()
     {
+        // First, create any missing hierarchy records and update items with IDs
+        foreach ($this->items as $index => $item) {
+            if ($index === 0) {
+                Log::debug('Pre-save item snapshot', [
+                    'item_index' => $index,
+                    'item' => $item,
+                ]);
+            }
+
+            // Create Account Class if needed
+            if (
+                !empty($item['account_class_name']) &&
+                (empty($item['account_class_id']) || ($item['needs_class_creation'] ?? false))
+            ) {
+                $this->items[$index]['account_class_id'] = $this->createOrGetAccountClass(
+                    $item['account_class_name'],
+                    $item['normal_balance'] ?? 'debit'
+                );
+            }
+
+            // Create Account Subclass if needed
+            if (!empty($item['account_subclass_name']) &&
+                $this->items[$index]['account_class_id'] &&
+                (empty($item['account_subclass_id']) || ($item['needs_subclass_creation'] ?? false))) {
+                $this->items[$index]['account_subclass_id'] = $this->createOrGetAccountSubclass(
+                    $item['account_subclass_name'],
+                    $this->items[$index]['account_class_id'],
+                    $item['account_subclass_sort_order'] ?? 1
+                );
+            }
+
+            // Create Account Type if needed
+            if (!empty($item['account_type_name']) &&
+                $this->items[$index]['account_subclass_id'] &&
+                (empty($item['account_type_id']) || ($item['needs_type_creation'] ?? false))) {
+                $this->items[$index]['account_type_id'] = $this->createOrGetAccountType(
+                    $item['account_type_name'],
+                    $this->items[$index]['account_subclass_id'],
+                    $item['account_type_sort_order'] ?? 1
+                );
+            }
+
+            // Create Account Subtype if needed
+            if (!empty($item['account_subtype_name']) &&
+                $this->items[$index]['account_type_id'] &&
+                (empty($item['account_subtype_id']) || ($item['needs_subtype_creation'] ?? false))) {
+                $subtypeId = $this->createOrGetAccountSubtype(
+                    $item['account_subtype_name'],
+                    $this->items[$index]['account_type_id'],
+                    $item['account_subtype_sort_order'] ?? 0
+                );
+                $this->items[$index]['account_subtype_id'] = $subtypeId;
+            }
+
+            // Ensure subtype_id is set
+            if (empty($this->items[$index]['account_subtype_id']) && !empty($item['account_subtype_id'])) {
+                $this->items[$index]['account_subtype_id'] = $item['account_subtype_id'];
+            }
+        }
+
         // Validate all items
         $rules = [];
+        $attributeNames = [];
         foreach ($this->items as $index => $item) {
+            $rowNumber = $index + 1;
+
             $rules["items.{$index}.account_name"] = 'required|max:200';
             $rules["items.{$index}.account_class_id"] = 'required';
             $rules["items.{$index}.account_subclass_id"] = 'required';
             $rules["items.{$index}.account_type_id"] = 'required';
             $rules["items.{$index}.account_subtype_id"] = 'required';
-            $rules["items.{$index}.account_code"] = 'required|size:6';
             $rules["items.{$index}.normal_balance"] = 'required|in:debit,credit';
+
+            // Human-readable attribute names for validation errors
+            $attributeNames["items.{$index}.account_name"] = "Account Name (row {$rowNumber})";
+            $attributeNames["items.{$index}.account_class_id"] = "Account Class (row {$rowNumber})";
+            $attributeNames["items.{$index}.account_subclass_id"] = "Account Subclass (row {$rowNumber})";
+            $attributeNames["items.{$index}.account_type_id"] = "Account Type (row {$rowNumber})";
+            $attributeNames["items.{$index}.account_subtype_id"] = "Account Subtype (row {$rowNumber})";
+            $attributeNames["items.{$index}.normal_balance"] = "Normal Balance (row {$rowNumber})";
         }
 
-        $this->validate($rules);
+        $this->validate($rules, [], $attributeNames);
+
+        // Log all items before database creation
+        Log::info('About to create COA items in database', [
+            'total_items' => count($this->items),
+            'items_summary' => array_map(function($item, $index) {
+                return [
+                    'index' => $index,
+                    'account_name' => $item['account_name'] ?? 'N/A',
+                    'account_subtype_id' => $item['account_subtype_id'] ?? 'N/A',
+                ];
+            }, $this->items, array_keys($this->items)),
+        ]);
 
         // Create all items
-        foreach ($this->items as $item) {
+        foreach ($this->items as $index => $item) {
+            Log::debug('Creating COA item', [
+                'index' => $index,
+                'account_name' => $item['account_name'],
+                'account_subtype_id' => $item['account_subtype_id'],
+            ]);
             $coaItem = COATemplateItem::create([
-                'account_code' => $item['account_code'],
                 'account_name' => $item['account_name'],
                 'account_subtype_id' => $item['account_subtype_id'],
                 'normal_balance' => $item['normal_balance'],
                 'is_active' => $item['is_active'] ?? true,
-                'is_default' => $item['is_default'] ?? true,
+                'is_default' => $item['is_default'] ?? false,
             ]);
 
             // Create pivot table entries for business types

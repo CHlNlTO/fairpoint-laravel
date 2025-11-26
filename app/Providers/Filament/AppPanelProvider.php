@@ -27,6 +27,12 @@ class AppPanelProvider extends PanelProvider
             ->id('app')
             ->path('app')
             ->login()
+            ->registration()
+            ->passwordReset()
+            ->emailVerification()
+            ->emailChangeVerification()
+            ->spa(hasPrefetching: true)
+            ->profile()
             ->colors([
                 'primary' => Color::Sky,
             ])
@@ -37,6 +43,13 @@ class AppPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
             ->widgets([
+            ])
+            ->navigationGroups([
+                'Manage Business',
+                'Manage Accounts',
+                'Manage Agencies',
+                'Manage Types',
+                'Manage Permissions',
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -56,6 +69,7 @@ class AppPanelProvider extends PanelProvider
                 ->navigationGroup('Manage Permissions')
             ])
             ->topbar(false)
+            ->sidebarWidth('16rem')
             ->globalSearch(false)
             ->authMiddleware([
                 Authenticate::class,

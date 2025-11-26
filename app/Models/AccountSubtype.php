@@ -21,17 +21,16 @@ class AccountSubtype extends Model
         'user_id',
         'business_registration_id',
         'name',
+        'sort_order',
         'is_active',
         'is_system_defined',
         'description',
         'hint',
-        'code',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'is_system_defined' => 'boolean',
-        'code' => 'integer',
     ];
 
     public function accountType()

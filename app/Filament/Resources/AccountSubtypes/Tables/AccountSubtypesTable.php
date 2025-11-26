@@ -23,9 +23,6 @@ class AccountSubtypesTable
                     ->label('Type')
                     ->sortable()
                     ->searchable(),
-                Tables\Columns\TextColumn::make('code')
-                    ->sortable()
-                    ->searchable(),
                 Tables\Columns\TextColumn::make('name')
                     ->sortable()
                     ->searchable(),

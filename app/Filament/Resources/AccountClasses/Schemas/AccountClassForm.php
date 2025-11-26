@@ -20,8 +20,7 @@ class AccountClassForm
                             ->label('Code')
                             ->numeric()
                             ->required()
-                            ->minValue(1)
-                            ->unique(ignoreRecord: true),
+                            ->minValue(1),
                         Forms\Components\TextInput::make('name')
                             ->label('Name')
                             ->required()

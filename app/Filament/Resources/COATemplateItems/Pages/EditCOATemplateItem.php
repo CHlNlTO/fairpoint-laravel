@@ -3,17 +3,26 @@
 namespace App\Filament\Resources\COATemplateItems\Pages;
 
 use App\Filament\Resources\COATemplateItems\COATemplateItemResource;
-use Filament\Actions\DeleteAction;
-use Filament\Resources\Pages\EditRecord;
+use App\Models\COATemplateItem;
+use Filament\Resources\Pages\Page;
 
-class EditCOATemplateItem extends EditRecord
+class EditCOATemplateItem extends Page
 {
     protected static string $resource = COATemplateItemResource::class;
 
-    protected function getHeaderActions(): array
+    // protected static ?string $navigationIcon = null;
+
+    protected string $view = 'filament.resources.coa-template-items.pages.edit';
+
+    public COATemplateItem $record;
+
+    public function mount(COATemplateItem $record): void
     {
-        return [
-            DeleteAction::make(),
-        ];
+        $this->record = $record;
+    }
+
+    public function getTitle(): string
+    {
+        return 'Edit Chart of Account Item';
     }
 }

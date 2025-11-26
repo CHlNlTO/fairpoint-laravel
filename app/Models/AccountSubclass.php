@@ -18,15 +18,14 @@ class AccountSubclass extends Model
 
     protected $fillable = [
         'account_class_id',
-        'code',
         'name',
+        'sort_order',
         'is_active',
         'description',
         'hint',
     ];
 
     protected $casts = [
-        'code' => 'integer',
         'is_active' => 'boolean',
     ];
 
