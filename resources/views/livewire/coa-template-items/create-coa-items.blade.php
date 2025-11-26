@@ -165,7 +165,7 @@
 }">
     @if($this->mode === 'create')
         <!-- CSV Import Section -->
-        <div class="mb-6 p-4 rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        <div class="p-4 mb-6 bg-white border border-gray-200 rounded-lg dark:bg-gray-800 dark:border-gray-700">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Import from CSV</h3>
             </div>
@@ -187,7 +187,7 @@
                         wire:loading.attr="disabled"
                         wire:target="processCsv,save"
                         type="button"
-                        class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600">
+                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-semibold text-white bg-gray-600 rounded-lg shadow-sm gap-x-2 hover:bg-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-600">
                     Download Template
                 </button>
                 <button wire:click="processCsv"
@@ -195,8 +195,8 @@
                         wire:loading.attr="disabled"
                         @disabled(!$csvFile)
                         type="button"
-                        class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60 disabled:cursor-not-allowed">
-                    <svg wire:loading wire:target="processCsv" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        class="inline-flex items-center justify-center px-3 py-2 text-sm font-semibold text-white rounded-lg shadow-sm gap-x-2 bg-primary-600 hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60 disabled:cursor-not-allowed">
+                    <svg wire:loading wire:target="processCsv" class="w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                     </svg>
@@ -212,8 +212,8 @@
                 wire:target="save,processCsv"
                 wire:loading.attr="disabled"
                 type="button"
-                class="inline-flex items-center justify-center gap-x-2 rounded-lg bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60 disabled:cursor-not-allowed">
-            <svg wire:loading wire:target="save" class="h-4 w-4 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                class="inline-flex items-center justify-center px-3 py-2 text-sm font-semibold text-white rounded-lg shadow-sm gap-x-2 bg-primary-600 hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-60 disabled:cursor-not-allowed">
+            <svg wire:loading wire:target="save" class="w-4 h-4 text-white animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
             </svg>
@@ -225,14 +225,14 @@
     </div>
 
     @if (session()->has('success'))
-        <div class="rounded-lg bg-success-50 dark:bg-success-900/20 p-4 border border-success-200 dark:border-success-800">
+        <div class="p-4 border rounded-lg bg-success-50 dark:bg-success-900/20 border-success-200 dark:border-success-800">
             <p class="text-sm text-success-800 dark:text-success-200">{{ session('success') }}</p>
         </div>
     @endif
 
     @if ($errors->any())
-        <div class="rounded-lg bg-danger-50 dark:bg-danger-900/20 p-4 border border-danger-200 dark:border-danger-800">
-            <ul class="list-disc list-inside text-sm text-danger-800 dark:text-danger-200">
+        <div class="p-4 border rounded-lg bg-danger-50 dark:bg-danger-900/20 border-danger-200 dark:border-danger-800">
+            <ul class="text-sm list-disc list-inside text-danger-800 dark:text-danger-200">
                 @foreach ($errors->all() as $error)
                     <li>{{ $error }}</li>
                 @endforeach
@@ -240,7 +240,7 @@
         </div>
     @endif
 
-    <div class="fi-fo-table-repeater fi-compact overflow-x-auto gap-64 scrollbar-thin pb-10">
+    <div class="gap-64 pb-10 overflow-x-auto fi-fo-table-repeater fi-compact scrollbar-thin">
         {{-- <div class="overflow-x-auto"> --}}
         <table>
             <thead>
@@ -289,7 +289,7 @@
                                                {{-- @focus="open = true" --}}
                                                @click="open = !open"
                                                @keydown.escape="open = false"
-                                               class="fi-input w-full"
+                                               class="w-full fi-input"
                                                placeholder="Type or select">
                                         <div x-show="open && filteredOptions.length > 0"
                                              x-transition:enter="transition ease-out duration-100"
@@ -299,12 +299,12 @@
                                              x-transition:leave-start="transform opacity-100 scale-100"
                                              x-transition:leave-end="transform opacity-0 scale-95"
                                              @click.outside="open = false"
-                                             class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
-                                            <ul class="fi-dropdown-list p-1">
+                                             class="absolute w-full mt-1 overflow-y-auto bg-white rounded-lg shadow-lg fi-dropdown-panel fi-scrollable z-100 ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60">
+                                            <ul class="p-1 fi-dropdown-list">
                                                 <template x-for="option in filteredOptions" :key="option.id">
                                                     <li @click="selectOption(option)"
                                                         :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_class_id === option.id }"
-                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                        class="px-3 py-2 cursor-pointer fi-dropdown-list-item fi-select-input-option hover:bg-gray-100 dark:hover:bg-gray-700">
                                                         <span x-text="option.name"></span>
                                                     </li>
                                                 </template>
@@ -439,7 +439,7 @@
                                             {{-- @focus="item.account_class_id && (open = true)" --}}
                                             @click="item.account_class_id && (open = !open)"
                                             @keydown.escape="open = false"
-                                            class="fi-input w-full"
+                                            class="w-full fi-input"
                                             placeholder="Type or select">
                                         <div x-show="open && filteredOptions.length > 0"
                                             x-transition:enter="transition ease-out duration-100"
@@ -449,12 +449,12 @@
                                             x-transition:leave-start="transform opacity-100 scale-100"
                                             x-transition:leave-end="transform opacity-0 scale-95"
                                             @click.outside="open = false"
-                                            class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
-                                            <ul class="fi-dropdown-list p-1">
+                                            class="absolute w-full mt-1 overflow-y-auto bg-white rounded-lg shadow-lg fi-dropdown-panel fi-scrollable z-100 ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60">
+                                            <ul class="p-1 fi-dropdown-list">
                                                 <template x-for="option in filteredOptions" :key="option.id">
                                                     <li @click="selectOption(option)"
                                                         :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subclass_id === option.id }"
-                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                        class="px-3 py-2 cursor-pointer fi-dropdown-list-item fi-select-input-option hover:bg-gray-100 dark:hover:bg-gray-700">
                                                         <span x-text="option.name"></span>
                                                     </li>
                                                 </template>
@@ -577,7 +577,7 @@
                                             {{-- @focus="item.account_subclass_id && (open = true)" --}}
                                             @click="item.account_subclass_id && (open = !open)"
                                             @keydown.escape="open = false"
-                                            class="fi-input w-full"
+                                            class="w-full fi-input"
                                             placeholder="Type or select">
                                         <div x-show="open && filteredOptions.length > 0"
                                             x-transition:enter="transition ease-out duration-100"
@@ -587,12 +587,12 @@
                                             x-transition:leave-start="transform opacity-100 scale-100"
                                             x-transition:leave-end="transform opacity-0 scale-95"
                                             @click.outside="open = false"
-                                            class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
-                                            <ul class="fi-dropdown-list p-1">
+                                            class="absolute w-full mt-1 overflow-y-auto bg-white rounded-lg shadow-lg fi-dropdown-panel fi-scrollable z-100 ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60">
+                                            <ul class="p-1 fi-dropdown-list">
                                                 <template x-for="option in filteredOptions" :key="option.id">
                                                     <li @click="selectOption(option)"
                                                         :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_type_id === option.id }"
-                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                        class="px-3 py-2 cursor-pointer fi-dropdown-list-item fi-select-input-option hover:bg-gray-100 dark:hover:bg-gray-700">
                                                         <span x-text="option.name"></span>
                                                     </li>
                                                 </template>
@@ -701,7 +701,7 @@
                                             {{-- @focus="item.account_type_id && (open = true)" --}}
                                             @click="item.account_type_id && (open = !open)"
                                             @keydown.escape="open = false"
-                                            class="fi-input w-full"
+                                            class="w-full fi-input"
                                             placeholder="Type or select">
                                         <div x-show="open && filteredOptions.length > 0"
                                             x-transition:enter="transition ease-out duration-100"
@@ -711,12 +711,12 @@
                                             x-transition:leave-start="transform opacity-100 scale-100"
                                             x-transition:leave-end="transform opacity-0 scale-95"
                                             @click.outside="open = false"
-                                            class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60 overflow-y-auto">
-                                            <ul class="fi-dropdown-list p-1">
+                                            class="absolute w-full mt-1 overflow-y-auto bg-white rounded-lg shadow-lg fi-dropdown-panel fi-scrollable z-100 ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20 max-h-60">
+                                            <ul class="p-1 fi-dropdown-list">
                                                 <template x-for="option in filteredOptions" :key="option.id">
                                                     <li @click="selectOption(option)"
                                                         :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_subtype_id === option.id }"
-                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                                        class="px-3 py-2 cursor-pointer fi-dropdown-list-item fi-select-input-option hover:bg-gray-100 dark:hover:bg-gray-700">
                                                         <span x-text="option.name"></span>
                                                     </li>
                                                 </template>
@@ -749,10 +749,10 @@
                         <div class="fi-input-wrp fi-fo-select">
                             <div class="fi-input-wrp-content-ctn">
                                 <div class="fi-select-input">
-                                    <div class="fi-select-input-ctn relative" @click.outside="open = false">
+                                    <div class="relative fi-select-input-ctn" @click.outside="open = false">
                                         <button type="button"
                                                 @click="open = !open"
-                                                class="fi-select-input-btn w-full text-left">
+                                                class="w-full text-left fi-select-input-btn">
                                             <div class="fi-select-input-value-ctn">
                                                 <span x-show="!item.normal_balance" class="fi-select-input-placeholder">Select an option</span>
                                                 <span x-show="item.normal_balance" x-text="selectedLabel"></span>
@@ -765,12 +765,12 @@
                                              x-transition:leave="transition ease-in duration-75"
                                              x-transition:leave-start="transform opacity-100 scale-100"
                                              x-transition:leave-end="transform opacity-0 scale-95"
-                                             class="fi-dropdown-panel fi-scrollable absolute z-100 w-full mt-1 rounded-lg bg-white shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20">
-                                            <ul class="fi-dropdown-list p-1">
+                                             class="absolute w-full mt-1 bg-white rounded-lg shadow-lg fi-dropdown-panel fi-scrollable z-100 ring-1 ring-gray-950/5 dark:bg-gray-800 dark:ring-white/20">
+                                            <ul class="p-1 fi-dropdown-list">
                                                 <template x-for="option in options" :key="option.value">
                                                     <li @click="item.normal_balance = option.value; open = false;"
                                                         :class="{ 'bg-gray-100 dark:bg-gray-700': item.normal_balance === option.value }"
-                                                        class="fi-dropdown-list-item fi-select-input-option cursor-pointer">
+                                                        class="cursor-pointer fi-dropdown-list-item fi-select-input-option">
                                                         <span x-text="option.label"></span>
                                                     </li>
                                                 </template>
@@ -785,15 +785,15 @@
                         <!-- Business Type -->
                         <td class="min-w-56">
                             <div class="fi-input-wrp" :class="{ 'fi-disabled': isDisabled(item, 'business') }">
-                                <div class="space-y-1 max-h-32 overflow-y-auto p-1">
+                                <div class="p-1 space-y-1 overflow-y-auto max-h-32">
                                     <template x-for="bt in businessTypes" :key="bt.id">
-                                        <label class="flex items-center gap-x-2 cursor-pointer"
+                                        <label class="flex items-center cursor-pointer gap-x-2"
                                                :class="{ 'opacity-50 cursor-not-allowed': isDisabled(item, 'business') }">
                                             <input type="checkbox"
                                                    :checked="isChecked(item, 'business', bt.id)"
                                                    :disabled="isDisabled(item, 'business')"
                                                    @click="toggleType(item, 'business', bt.id)"
-                                                   class="fi-checkbox-input rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50">
+                                                   class="border-gray-300 rounded shadow-sm fi-checkbox-input text-primary-600 focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50">
                                             <span class="text-sm" x-text="bt.name"></span>
                                         </label>
                                     </template>
@@ -804,15 +804,15 @@
                         <!-- Industry Type -->
                         <td class="min-w-56">
                             <div class="fi-input-wrp" :class="{ 'fi-disabled': isDisabled(item, 'industry') }">
-                                <div class="space-y-1 max-h-32 overflow-y-auto p-1">
+                                <div class="p-1 space-y-1 overflow-y-auto max-h-32">
                                     <template x-for="it in industryTypes" :key="it.id">
-                                        <label class="flex items-center gap-x-2 cursor-pointer"
+                                        <label class="flex items-center cursor-pointer gap-x-2"
                                                :class="{ 'opacity-50 cursor-not-allowed': isDisabled(item, 'industry') }">
                                             <input type="checkbox"
                                                    :checked="isChecked(item, 'industry', it.id)"
                                                    :disabled="isDisabled(item, 'industry')"
                                                    @click="toggleType(item, 'industry', it.id)"
-                                                   class="fi-checkbox-input rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50">
+                                                   class="border-gray-300 rounded shadow-sm fi-checkbox-input text-primary-600 focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50">
                                             <span class="text-sm" x-text="it.name"></span>
                                         </label>
                                     </template>
@@ -823,15 +823,15 @@
                         <!-- Tax Type -->
                         <td class="min-w-56">
                             <div class="fi-input-wrp" :class="{ 'fi-disabled': isDisabled(item, 'tax') }">
-                                <div class="space-y-1 max-h-32 overflow-y-auto p-1">
+                                <div class="p-1 space-y-1 overflow-y-auto max-h-32">
                                     <template x-for="tt in taxTypes" :key="tt.id">
-                                        <label class="flex items-center gap-x-2 cursor-pointer"
+                                        <label class="flex items-center cursor-pointer gap-x-2"
                                                :class="{ 'opacity-50 cursor-not-allowed': isDisabled(item, 'tax') }">
                                             <input type="checkbox"
                                                    :checked="isChecked(item, 'tax', tt.id)"
                                                    :disabled="isDisabled(item, 'tax')"
                                                    @click="toggleType(item, 'tax', tt.id)"
-                                                   class="fi-checkbox-input rounded border-gray-300 text-primary-600 shadow-sm focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50">
+                                                   class="border-gray-300 rounded shadow-sm fi-checkbox-input text-primary-600 focus:border-primary-500 focus:ring focus:ring-primary-500 focus:ring-opacity-50">
                                             <span class="text-sm" x-text="tt.name"></span>
                                         </label>
                                     </template>
@@ -841,7 +841,7 @@
 
                         <!-- Is Active -->
                         <td class="min-w-[80px]">
-                            <div class="col-span-1 flex items-center justify-center fi-fo-field-content-col">
+                            <div class="flex items-center justify-center col-span-1 fi-fo-field-content-col">
                                 <button x-bind:aria-checked="item.is_active.toString()"
                                         x-on:click="item.is_active = !item.is_active"
                                         x-bind:class="
@@ -865,7 +865,7 @@
 
                         <!-- Is Default -->
                         <td class="min-w-[80px]">
-                            <div class="col-span-1 flex items-center justify-center fi-fo-field-content-col">
+                            <div class="flex items-center justify-center col-span-1 fi-fo-field-content-col">
                                 <button x-bind:aria-checked="item.is_default.toString()"
                                         x-on:click="item.is_default = !item.is_default"
                                         x-bind:class="
