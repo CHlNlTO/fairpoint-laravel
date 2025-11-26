@@ -25,7 +25,7 @@
             <a href="#features" class="px-4 py-2 rounded-full text-slate-600 hover:bg-slate-100 transition-colors">Features</a>
             <a href="/pricing" class="px-4 py-2 rounded-full text-slate-600 hover:bg-slate-100 transition-colors">Pricing</a>
             <a href="/about" class="px-4 py-2 rounded-full text-slate-600 hover:bg-slate-100 transition-colors">About</a>
-            <a href="#contact" class="px-4 py-2 rounded-full text-slate-600 hover:bg-slate-100 transition-colors">Contact</a>
+            <a href="/contact" class="px-4 py-2 rounded-full text-slate-600 hover:bg-slate-100 transition-colors">Contact</a>
         </div>
 
         <!-- Dark Mode + Auth Buttons (Hardcoded) -->
