@@ -21,8 +21,12 @@
 
     // COA Source selection: 'default' or 'import'
     coaSource: 'default',
+    importStep: 1, // Wizard step for import flow (1: Upload & Map, 2: Preview/Review)
     uploadedFileName: '',
     csvHeaders: [],
+    csvFileContent: '', // Store full CSV content for processing
+    importedCoaPreview: [], // Preview of imported CSV data after mapping
+    csvMappings: {}, // Store field mappings
 
     // COA Preview - loaded upfront for instant filtering
     coaPreview: [],
@@ -135,10 +139,17 @@
         // Store reference to parent scope methods for nested Alpine contexts
         this.parentScope = {
             updateAccountCodeDebounced: (item) => this.updateAccountCodeDebounced(item),
+            updateImportedAccountCodeDebounced: (item) => this.updateImportedAccountCodeDebounced(item),
             updateAccountCodeOnBlur: (item) => this.updateAccountCodeOnBlur(item),
+            updateImportedAccountCodeOnBlur: (item) => this.updateImportedAccountCodeOnBlur(item),
             generateAccountCodeFromItem: (item) => this.generateAccountCodeFromItem(item),
+            generateImportedAccountCodeFromItem: (item) => this.generateImportedAccountCodeFromItem(item),
             updateSelectedCoaItems: () => this.updateSelectedCoaItems(),
+            updateImportedSelectedCoaItems: () => this.updateImportedSelectedCoaItems(),
             onTypeChange: (item, typeId) => this.onTypeChange(item, typeId),
+            onImportedClassChange: (item, classId) => this.onImportedClassChange(item, classId),
+            onImportedSubclassChange: (item, subclassId) => this.onImportedSubclassChange(item, subclassId),
+            onImportedTypeChange: (item, typeId) => this.onImportedTypeChange(item, typeId),
             removeCoaItemRow: (index) => this.removeCoaItemRow(index),
             addCoaItemRow: (index, sourceItem) => this.addCoaItemRow(index, sourceItem),
             isLastRowOfAccountType: (item, index) => this.isLastRowOfAccountType(item, index),
@@ -504,6 +515,23 @@
         }, 3000);
     },
 
+    // Debounced account code generation for imported items
+    updateImportedAccountCodeDebounced(item) {
+        // Clear existing timeout for this item
+        if (this.debounceTimers[item.id]) {
+            clearTimeout(this.debounceTimers[item.id]);
+        }
+
+        // Set new timeout (3 seconds)
+        this.debounceTimers[item.id] = setTimeout(() => {
+            if (item.account_class_id && item.account_subclass_id) {
+                item.account_code = this.generateImportedAccountCodeFromItem(item);
+                this.updateImportedSelectedCoaItems();
+            }
+            delete this.debounceTimers[item.id];
+        }, 3000);
+    },
+
     // Update account code on blur (immediate)
     updateAccountCodeOnBlur(item) {
         // Clear any pending debounce for this item
@@ -515,6 +543,20 @@
         if (item.account_class_id && item.account_subclass_id) {
             item.account_code = this.generateAccountCodeFromItem(item);
             this.updateSelectedCoaItems();
+        }
+    },
+
+    // Update account code on blur for imported items (immediate)
+    updateImportedAccountCodeOnBlur(item) {
+        // Clear any pending debounce for this item
+        if (this.debounceTimers[item.id]) {
+            clearTimeout(this.debounceTimers[item.id]);
+            delete this.debounceTimers[item.id];
+        }
+
+        if (item.account_class_id && item.account_subclass_id) {
+            item.account_code = this.generateImportedAccountCodeFromItem(item);
+            this.updateImportedSelectedCoaItems();
         }
     },
 
@@ -567,6 +609,181 @@
         return `${classDigit}${subclassDigit}${typeDigits}${subtypeDigits}`;
     },
 
+    // Isolated account code generation for imported items (only looks at importedCoaPreview)
+    generateImportedAccountCodeFromItem(item) {
+        if (!item.account_class_id || !item.account_subclass_id) {
+            return item.account_code || '';
+        }
+
+        const classCodes = this.coaStructure.classCodes || {};
+        const subclassOrders = this.coaStructure.subclassOrders || {};
+
+        const classDigit = this.padNumber(classCodes[item.account_class_id] ?? 0, 1);
+        const subclassDigit = this.padNumber(subclassOrders[item.account_subclass_id] ?? 1, 1);
+        const typeDigits = this.padNumber(this.getImportedTypeOrder(item), 2);
+        const subtypeDigits = this.padNumber(this.getImportedSubtypeOrder(item), 2);
+
+        return `${classDigit}${subclassDigit}${typeDigits}${subtypeDigits}`;
+    },
+
+    getImportedTypeOrder(item) {
+        if (!item.account_subclass_id) {
+            return 1;
+        }
+
+        const typeOrders = this.coaStructure.typeOrders || {};
+        if (item.account_type_id && typeOrders[item.account_type_id] !== undefined) {
+            return typeOrders[item.account_type_id];
+        }
+
+        const subclassId = String(item.account_subclass_id);
+        const typeName = (item.account_type_name || '').trim().toLowerCase();
+        const baseOrder = this.getMaxImportedTypeOrderForSubclass(subclassId);
+
+        if (!typeName) {
+            return baseOrder + 1;
+        }
+
+        const customTypeNames = this.getCustomImportedTypeNamesForSubclass(subclassId);
+        const position = customTypeNames.indexOf(typeName);
+        const offset = position !== -1 ? position + 1 : customTypeNames.length + 1;
+        return baseOrder + offset;
+    },
+
+    getMaxImportedTypeOrderForSubclass(subclassId) {
+        if (!subclassId) {
+            return 0;
+        }
+        const typeOrders = this.coaStructure.typeOrders || {};
+        let maxOrder = 0;
+        (this.accountTypes || []).forEach((type) => {
+            if (String(type.account_subclass_id) === String(subclassId)) {
+                const order = typeOrders[type.id] ?? 1;
+                if (order > maxOrder) {
+                    maxOrder = order;
+                }
+            }
+        });
+        return maxOrder;
+    },
+
+    getCustomImportedTypeNamesForSubclass(subclassId) {
+        if (!subclassId) {
+            return [];
+        }
+        const typeOrders = this.coaStructure.typeOrders || {};
+        const names = [];
+        (this.importedCoaPreview || []).forEach((row) => {
+            if (String(row.account_subclass_id) !== String(subclassId)) {
+                return;
+            }
+            const hasKnownType = row.account_type_id && typeOrders[row.account_type_id] !== undefined;
+            if (hasKnownType) {
+                return;
+            }
+            const name = (row.account_type_name || '').trim().toLowerCase();
+            if (name && !names.includes(name)) {
+                names.push(name);
+            }
+        });
+        return names;
+    },
+
+    getMaxImportedSubtypeFromPreview(item) {
+        // Find the maximum subtype number from actual account codes in importedCoaPreview only
+        // Account code format: [class][subclass][type][subtype] = 6 digits total
+        // Subtype is the last 2 digits
+        if (!item.account_class_id || !item.account_subclass_id) {
+            return { maxSubtype: -1, foundAny: false };
+        }
+
+        if (!item.account_type_id && !item.account_type_name) {
+            return { maxSubtype: -1, foundAny: false };
+        }
+
+        const classCodes = this.coaStructure.classCodes || {};
+        const subclassOrders = this.coaStructure.subclassOrders || {};
+        const typeOrders = this.coaStructure.typeOrders || {};
+
+        const classDigit = this.padNumber(classCodes[item.account_class_id] ?? 0, 1);
+        const subclassDigit = this.padNumber(subclassOrders[item.account_subclass_id] ?? 1, 1);
+
+        // Get type digits
+        let typeDigits;
+        if (item.account_type_id && typeOrders[item.account_type_id] !== undefined) {
+            typeDigits = this.padNumber(typeOrders[item.account_type_id], 2);
+        } else {
+            typeDigits = this.padNumber(this.getImportedTypeOrder(item), 2);
+        }
+
+        // Build the prefix to match (first 4 digits: class + subclass + type)
+        const prefix = `${classDigit}${subclassDigit}${typeDigits}`;
+
+        let maxSubtype = -1;
+        let foundAny = false;
+
+        // Look through ONLY imported items
+        (this.importedCoaPreview || []).forEach((row) => {
+            // Skip the current item
+            if (row === item || row.id === item.id) {
+                return;
+            }
+
+            // Only check items with the same class/subclass
+            if (row.account_class_id !== item.account_class_id ||
+                row.account_subclass_id !== item.account_subclass_id) {
+                return;
+            }
+
+            // Check if type matches (by ID or by name)
+            const typeMatches =
+                (item.account_type_id && row.account_type_id === item.account_type_id) ||
+                (!item.account_type_id && item.account_type_name &&
+                 row.account_type_name &&
+                 row.account_type_name.toLowerCase().trim() === item.account_type_name.toLowerCase().trim());
+
+            if (!typeMatches) {
+                return;
+            }
+
+            // Only use existing account codes
+            const accountCode = row.account_code;
+
+            if (accountCode && accountCode.length >= 6) {
+                // Check if the prefix matches
+                if (accountCode.substring(0, 4) === prefix) {
+                    foundAny = true;
+                    // Extract the subtype (last 2 digits)
+                    const subtypeStr = accountCode.substring(4, 6);
+                    const subtypeNum = parseInt(subtypeStr, 10);
+                    if (!isNaN(subtypeNum) && subtypeNum > maxSubtype) {
+                        maxSubtype = subtypeNum;
+                    }
+                }
+            }
+        });
+
+        return { maxSubtype: foundAny ? maxSubtype : -1, foundAny };
+    },
+
+    getImportedSubtypeOrder(item) {
+        if (!item.account_type_id && !item.account_type_name) {
+            return 0;
+        }
+
+        // Check what's the maximum subtype number already used in imported preview
+        const { maxSubtype, foundAny } = this.getMaxImportedSubtypeFromPreview(item);
+
+        // If we found existing codes in imported preview, use the next sequential number
+        if (foundAny && maxSubtype >= 0) {
+            return maxSubtype + 1;
+        }
+
+        // No imported items found - start at 00
+        // For imported items, always start at 00 for the first item of each type
+        return 0;
+    },
+
     onClassChange(item, classId) {
         const selectedClass = this.accountClasses.find(c => c.id === classId);
         if (selectedClass) {
@@ -609,6 +826,52 @@
                 item.account_code = this.generateAccountCodeFromItem(item);
             }
             this.updateSelectedCoaItems();
+        }
+    },
+
+    // Separate handlers for imported items that preserve subtype
+    onImportedClassChange(item, classId) {
+        const selectedClass = this.accountClasses.find(c => c.id === classId);
+        if (selectedClass) {
+            item.account_class_id = selectedClass.id;
+            item.account_class_name = selectedClass.name;
+            item.account_subclass_id = '';
+            item.account_subclass_name = '';
+            item.account_type_id = '';
+            item.account_type_name = '';
+            // DO NOT clear account_subtype_name for imported items
+            if (item.account_class_id) {
+                item.account_code = this.generateImportedAccountCodeFromItem(item);
+            }
+            this.updateImportedSelectedCoaItems();
+        }
+    },
+
+    onImportedSubclassChange(item, subclassId) {
+        const selectedSubclass = this.accountSubclasses.find(s => s.id === subclassId);
+        if (selectedSubclass) {
+            item.account_subclass_id = selectedSubclass.id;
+            item.account_subclass_name = selectedSubclass.name;
+            item.account_type_id = '';
+            item.account_type_name = '';
+            // DO NOT clear account_subtype_name for imported items
+            if (item.account_class_id) {
+                item.account_code = this.generateImportedAccountCodeFromItem(item);
+            }
+            this.updateImportedSelectedCoaItems();
+        }
+    },
+
+    onImportedTypeChange(item, typeId) {
+        const selectedType = this.accountTypes.find(t => t.id === typeId);
+        if (selectedType) {
+            item.account_type_id = selectedType.id;
+            item.account_type_name = selectedType.name;
+            // DO NOT clear account_subtype_name for imported items
+            if (item.account_class_id) {
+                item.account_code = this.generateImportedAccountCodeFromItem(item);
+            }
+            this.updateImportedSelectedCoaItems();
         }
     },
 
@@ -974,16 +1237,20 @@
         reader.onload = (e) => {
             try {
                 const text = e.target.result;
+                this.csvFileContent = text; // Store full content for later processing
                 this.parseCSVHeaders(text);
+                // Reset imported preview when new file is uploaded
+                this.importedCoaPreview = [];
                 // Update select options after parsing
                 this.$nextTick(() => {
-                    this.updateSelectOptions();
+                    this.populateSelectOptions();
                 });
             } catch (error) {
                 console.error('Error reading file:', error);
                 alert('Error reading CSV file. Please try again.');
                 this.uploadedFileName = '';
                 this.csvHeaders = [];
+                this.csvFileContent = '';
             }
         };
         reader.onerror = () => {
@@ -999,10 +1266,8 @@
         const selectIds = [
             'coa_mapping_account_name',
             'coa_mapping_account_subtype',
-            'coa_mapping_account_type',
-            'coa_mapping_account_subclass',
-            'coa_mapping_account_class',
-            'coa_mapping_normal_balance'
+            'coa_mapping_normal_balance',
+            'coa_mapping_amount'
         ];
 
         selectIds.forEach(selectId => {
@@ -1106,7 +1371,156 @@
         return result;
     },
 
+    processCsvMapping() {
+        // Get field mappings from select elements
+        const accountNameMapping = document.getElementById('coa_mapping_account_name')?.value || '';
+        const accountSubtypeMapping = document.getElementById('coa_mapping_account_subtype')?.value || '';
+        const normalBalanceMapping = document.getElementById('coa_mapping_normal_balance')?.value || '';
+        const amountMapping = document.getElementById('coa_mapping_amount')?.value || '';
+
+        // Store mappings
+        this.csvMappings = {
+            account_name: accountNameMapping,
+            account_subtype: accountSubtypeMapping,
+            normal_balance: normalBalanceMapping,
+            amount: amountMapping
+        };
+
+        // Validate that at least account name is mapped
+        if (!accountNameMapping) {
+            alert('Please map at least the Account Name field to continue.');
+            return false;
+        }
+
+        // Parse CSV content
+        if (!this.csvFileContent) {
+            alert('No CSV file content available. Please upload the file again.');
+            return false;
+        }
+
+        try {
+            const lines = this.csvFileContent.split(/\r?\n/).filter(line => line.trim() !== '');
+
+            if (lines.length < 2) {
+                alert('CSV file must contain at least a header row and one data row.');
+                return false;
+            }
+
+            // Get header indices
+            const headers = this.parseCSVLine(lines[0]);
+            const accountNameIndex = headers.indexOf(accountNameMapping);
+            const accountSubtypeIndex = accountSubtypeMapping ? headers.indexOf(accountSubtypeMapping) : -1;
+            const normalBalanceIndex = normalBalanceMapping ? headers.indexOf(normalBalanceMapping) : -1;
+            const amountIndex = amountMapping ? headers.indexOf(amountMapping) : -1;
+
+            if (accountNameIndex === -1) {
+                alert('Mapped Account Name column not found in CSV file.');
+                return false;
+            }
+
+            // Process data rows
+            const mappedItems = [];
+            for (let i = 1; i < lines.length; i++) {
+                const row = this.parseCSVLine(lines[i]);
+
+                // Skip empty rows
+                if (row.length === 0 || row.every(cell => !cell.trim())) {
+                    continue;
+                }
+
+                // Get values from mapped columns
+                const accountName = row[accountNameIndex]?.trim() || '';
+                const accountSubtype = accountSubtypeIndex >= 0 ? (row[accountSubtypeIndex]?.trim() || '') : '';
+                const normalBalance = normalBalanceIndex >= 0 ? (row[normalBalanceIndex]?.trim().toLowerCase() || 'debit') : 'debit';
+                const amount = amountIndex >= 0 ? (row[amountIndex]?.trim() || '') : '';
+
+                // Skip rows without account name
+                if (!accountName) {
+                    continue;
+                }
+
+                // Normalize normal balance
+                const normalizedBalance = (normalBalance === 'credit' || normalBalance === 'cr') ? 'credit' : 'debit';
+
+                // Create preview item (similar structure to default COA preview)
+                const item = {
+                    id: `imported-${Date.now()}-${i}`,
+                    isEditable: true,
+                    isUserAdded: true, // All imported items are user-added
+                    account_code: '',
+                    account_name: accountName,
+                    account_class_id: '',
+                    account_class_name: '',
+                    account_subclass_id: '',
+                    account_subclass_name: '',
+                    account_type_id: '',
+                    account_type_name: '',
+                    account_subtype_name: accountSubtype,
+                    normal_balance: normalizedBalance,
+                    normal_balance_label: this.formatBalance(normalizedBalance),
+                    amount: amount, // Store amount for display
+                };
+
+                mappedItems.push(item);
+            }
+
+            // Update imported preview
+            this.importedCoaPreview = mappedItems;
+
+            // Also update selectedCoaItems for form submission
+            this.updateImportedSelectedCoaItems();
+
+            return true;
+        } catch (error) {
+            console.error('Error processing CSV mapping:', error);
+            alert('Error processing CSV file. Please check the file format and try again.');
+            return false;
+        }
+    },
+
+    updateImportedSelectedCoaItems() {
+        // Update selectedCoaItems with imported data when using import source
+        if (this.coaSource === 'import') {
+            this.selectedCoaItems = this.importedCoaPreview
+                .filter(item => item.account_name && item.account_class_id && item.account_subclass_id)
+                .map(item => {
+                    // Ensure account code is generated using imported-specific logic
+                    if (!item.account_code && item.account_class_id && item.account_subclass_id) {
+                        item.account_code = this.generateImportedAccountCodeFromItem(item);
+                    }
+
+                    const accountCode = item.account_code || this.generateImportedAccountCodeFromItem(item);
+
+                    return {
+                        coa_item_id: null, // Imported items don't have existing IDs
+                        account_code: accountCode,
+                        account_name: item.account_name || '',
+                        account_class: item.account_class_name || 'N/A',
+                        account_subclass: item.account_subclass_name || 'N/A',
+                        account_type: item.account_type_name || 'N/A',
+                        account_subtype: item.account_subtype_name || 'N/A',
+                        normal_balance: item.normal_balance || 'debit',
+                        is_active: true,
+                        account_class_id: item.account_class_id,
+                        account_subclass_id: item.account_subclass_id,
+                        account_type_id: item.account_type_id || '',
+                        account_type_name: item.account_type_name || '',
+                        account_subtype_name: item.account_subtype_name || '',
+                        amount: item.amount || '',
+                    };
+                });
+        }
+    },
+
     submitForm() {
+        // Update imported COA items if using import source
+        if (this.coaSource === 'import') {
+            this.updateImportedSelectedCoaItems();
+        } else {
+            // Update default COA items if using default source
+            this.updateSelectedCoaItems();
+        }
+
         // OPTIMIZED: Batch all updates without await (no server round trips until submit)
         // This makes the submission instant instead of taking several minutes
         $wire.$set('business_name', this.business_name, false);
@@ -1592,7 +2006,6 @@
             <div class="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6">
                 <div class="space-y-3">
                     <h3 class="text-base font-semibold text-gray-900 dark:text-gray-100">Chart of Accounts</h3>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Choose how you want to set up your Chart of Accounts.</p>
 
                     <!-- COA Source Selection -->
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -1626,11 +2039,6 @@
 
                 <!-- Default COA Preview -->
                 <div x-show="coaSource === 'default'" class="space-y-3">
-                    <div>
-                        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Chart of Accounts Preview</h4>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Based on your selections, these accounts will be connected to the business registration.</p>
-                    </div>
-
                     <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
                         <!-- Table -->
                         <div class="overflow-x-auto">
@@ -1899,44 +2307,155 @@
                 </div>
 
                 <!-- Import COA Section -->
-                <div x-show="coaSource === 'import'" class="space-y-3">
-                    <div>
-                        <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Import Your Chart of Accounts</h4>
-                        <p class="text-sm text-gray-500 dark:text-gray-400">Upload a CSV file containing your Chart of Accounts data.</p>
+                <div x-show="coaSource === 'import'" class="space-y-6">
+                    @php
+                        $importSteps = [
+                            1 => 'Upload & Map Fields',
+                            2 => 'Review & Confirm',
+                        ];
+                    @endphp
+
+                    <!-- Import Wizard Steps -->
+                    <div class="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700 p-4 md:p-6">
+                        <ol class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            @foreach ($importSteps as $stepNumber => $label)
+                                <li class="flex items-start gap-3 md:flex-1">
+                                    <span class="flex h-8 w-8 items-center justify-center rounded-full border text-sm font-semibold"
+                                          :class="importStep >= {{ $stepNumber }} ? 'bg-primary-600 border-primary-600 text-white' : 'border-gray-300 text-gray-500 dark:border-gray-600 dark:text-gray-400'">
+                                        {{ $stepNumber }}
+                                    </span>
+                                    <div class="flex flex-col">
+                                        <span class="text-sm font-semibold text-gray-900 dark:text-gray-100">{{ $label }}</span>
+                                        <span class="text-xs text-gray-500 dark:text-gray-400">
+                                            @switch($stepNumber)
+                                                @case(1)Upload CSV and map columns.@break
+                                                @case(2)Review imported accounts.@break
+                                            @endswitch
+                                        </span>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ol>
                     </div>
 
-                    <div class="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-8">
-                        <div class="flex flex-col items-center justify-center space-y-4">
-                            <svg class="h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                            </svg>
-                            <div class="text-center w-full">
-                                <label for="coa_file_upload" class="cursor-pointer">
-                                    <span class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors">
-                                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                                        </svg>
-                                        <span x-text="uploadedFileName ? 'Change File' : 'Choose CSV File'"></span>
-                                    </span>
-                                    <input type="file"
-                                           id="coa_file_upload"
-                                           accept=".csv"
-                                           class="hidden"
-                                           @change="handleFileUpload($event)">
-                                </label>
-                                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                                    CSV files only. Maximum file size: 5MB
-                                </p>
+                    <!-- Import Wizard Navigation -->
+                    <div class="flex items-center justify-between">
+                        <button type="button"
+                                @click="importStep = Math.max(1, importStep - 1)"
+                                :disabled="importStep === 1"
+                                class="inline-flex items-center gap-2 rounded-lg border border-gray-300 dark:border-gray-600 px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            Previous
+                        </button>
 
-                                <!-- Display uploaded filename -->
-                                <div x-show="uploadedFileName" class="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                                    <div class="flex items-center gap-2">
-                                        <svg class="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                        <div class="flex-1 min-w-0">
-                                            <p class="text-sm font-medium text-green-900 dark:text-green-100">File uploaded successfully</p>
-                                            <p class="text-xs text-green-700 dark:text-green-300 truncate" x-text="uploadedFileName"></p>
+                        <button type="button"
+                                x-show="importStep < 2"
+                                @click="if (processCsvMapping()) { importStep = Math.min(2, importStep + 1); }"
+                                :disabled="csvHeaders.length === 0"
+                                class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                            Next Step
+                        </button>
+                    </div>
+
+                    <!-- Step 1: Upload & Map Fields -->
+                    <div x-show="importStep === 1" class="space-y-6">
+                        <div class="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Upload CSV File</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Upload your Chart of Accounts CSV file to import.</p>
+                            </div>
+
+                            <div class="rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-600 p-8">
+                                <div class="flex flex-col items-center justify-center space-y-4">
+                                    <svg class="h-12 w-12 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                    </svg>
+                                    <div class="text-center w-full">
+                                        <label for="coa_file_upload" class="cursor-pointer">
+                                            <span class="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-primary-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors">
+                                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                                                </svg>
+                                                <span x-text="uploadedFileName ? 'Change File' : 'Choose CSV File'"></span>
+                                            </span>
+                                            <input type="file"
+                                                   id="coa_file_upload"
+                                                   accept=".csv"
+                                                   class="hidden"
+                                                   @change="handleFileUpload($event)">
+                                        </label>
+                                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                            CSV files only. Maximum file size: 5MB
+                                        </p>
+
+                                        <!-- Display uploaded filename -->
+                                        <div x-show="uploadedFileName" class="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                            <div class="flex items-center gap-2">
+                                                <svg class="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                <div class="flex-1 min-w-0">
+                                                    <p class="text-sm font-medium text-green-900 dark:text-green-100">File uploaded successfully</p>
+                                                    <p class="text-xs text-green-700 dark:text-green-300 truncate" x-text="uploadedFileName"></p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Field Mapping Section -->
+                        <div x-show="csvHeaders.length > 0" class="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Map Fields</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Map the CSV columns to the corresponding Fairpoint Books fields.</p>
+                            </div>
+
+                            <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                                <div class="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
+                                    <!-- Left Column: Fairpoint Books Field -->
+                                    <div class="bg-gray-50 dark:bg-gray-800/50 p-4">
+                                        <h5 class="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-4">Fairpoint Books Field</h5>
+                                        <div class="space-y-3">
+                                            <div class="flex items-center h-9">
+                                                <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Name</span>
+                                                <span class="ml-1 text-danger-600 dark:text-danger-400">*</span>
+                                            </div>
+                                            <div class="flex items-center h-9">
+                                                <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Subtype</span>
+                                            </div>
+                                            <div class="flex items-center h-9">
+                                                <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Normal Balance</span>
+                                            </div>
+                                            <div class="flex items-center h-9">
+                                                <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Amount</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Right Column: Imported File Headers -->
+                                    <div class="bg-white dark:bg-gray-900 p-4">
+                                        <h5 class="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-4">Imported File Headers</h5>
+                                        <div class="space-y-3">
+                                            <!-- Account Name -->
+                                            <select id="coa_mapping_account_name" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                                <option value="">Select</option>
+                                            </select>
+
+                                            <!-- Account Subtype -->
+                                            <select id="coa_mapping_account_subtype" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                                <option value="">Select</option>
+                                            </select>
+
+                                            <!-- Normal Balance -->
+                                            <select id="coa_mapping_normal_balance" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                                <option value="">Select</option>
+                                            </select>
+
+                                            <!-- Amount -->
+                                            <select id="coa_mapping_amount" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
+                                                <option value="">Select</option>
+                                            </select>
                                         </div>
                                     </div>
                                 </div>
@@ -1944,76 +2463,238 @@
                         </div>
                     </div>
 
-                    <!-- Field Mapping Section -->
-                    <div x-show="csvHeaders.length > 0" class="space-y-4">
-                        <div>
-                            <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Map Fields</h4>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Map the CSV columns to the corresponding Fairpoint Books fields.</p>
-                        </div>
+                    <!-- Step 2: Review & Confirm -->
+                    <div x-show="importStep === 2" class="space-y-6">
+                        <div class="bg-white dark:bg-gray-900 shadow-sm rounded-xl border border-gray-200 dark:border-gray-700 p-6 space-y-6">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Review & Confirm</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Review your imported Chart of Accounts and configure account classifications before finalizing.</p>
+                            </div>
 
-                        <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
-                            <div class="grid grid-cols-2 divide-x divide-gray-200 dark:divide-gray-700">
-                                <!-- Left Column: Fairpoint Books Field -->
-                                <div class="bg-gray-50 dark:bg-gray-800/50 p-4">
-                                    <h5 class="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-4">Fairpoint Books Field</h5>
-                                    <div class="space-y-3">
-                                        <div class="flex items-center h-9">
-                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Name</span>
-                                            <span class="ml-1 text-danger-600 dark:text-danger-400">*</span>
-                                        </div>
-                                        <div class="flex items-center h-9">
-                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Subtype</span>
-                                        </div>
-                                        <div class="flex items-center h-9">
-                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Type</span>
-                                        </div>
-                                        <div class="flex items-center h-9">
-                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Subclass</span>
-                                        </div>
-                                        <div class="flex items-center h-9">
-                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Account Class</span>
-                                        </div>
-                                        <div class="flex items-center h-9">
-                                            <span class="text-xs font-medium text-gray-900 dark:text-gray-100">Normal Balance</span>
-                                        </div>
-                                    </div>
+                            <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700">
+                                <!-- Table -->
+                                <div class="overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" x-show="importedCoaPreview.length > 0">
+                                        <thead class="bg-gray-50 dark:bg-gray-800/60">
+                                            <tr>
+                                                <th class="px-2 py-2 w-8"></th>
+                                                <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Account Code</th>
+                                                <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Account Name</th>
+                                                <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Class</th>
+                                                <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Subclass</th>
+                                                <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Type</th>
+                                                <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Subtype</th>
+                                                <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300">Normal Balance</th>
+                                                <th class="px-2 py-2 text-left text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300" x-show="csvMappings.amount">Amount</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-900">
+                                            <template x-for="(item, index) in importedCoaPreview" :key="item.id || index">
+                                                <tr class="group hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors" x-data="{ hovered: false, parentScope: parentScope }" @mouseenter="hovered = true" @mouseleave="hovered = false">
+                                                    <!-- Delete Button -->
+                                                    <td class="px-2 py-2 w-8" style="min-width: 32px;">
+                                                        <button type="button"
+                                                                @click="importedCoaPreview.splice(index, 1); updateImportedSelectedCoaItems();"
+                                                                :class="{ 'invisible': !hovered, 'visible': hovered }"
+                                                                class="transition-opacity p-1 rounded hover:bg-red-100 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400"
+                                                                title="Delete row">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                                            </svg>
+                                                        </button>
+                                                    </td>
+
+                                                    <!-- Account Code -->
+                                                    <td class="px-2 py-2">
+                                                        <span class="text-xs font-medium text-gray-900 dark:text-gray-100"
+                                                              x-text="item.account_code || '-'"></span>
+                                                    </td>
+
+                                                    <!-- Account Name -->
+                                                    <td class="px-2 py-2">
+                                                        <input type="text"
+                                                               x-model="item.account_name"
+                                                               @input="item.account_code = item.account_class_id ? (parentScope ? parentScope.generateImportedAccountCodeFromItem(item) : generateImportedAccountCodeFromItem(item)) : item.account_code; updateImportedSelectedCoaItems();"
+                                                               class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                                               placeholder="Enter account name">
+                                                    </td>
+
+                                                    <!-- Account Class (Dropdown - always editable for imported items) -->
+                                                    <td class="px-2 py-2">
+                                                        <select x-model="item.account_class_id"
+                                                                @change="parentScope ? parentScope.onImportedClassChange(item, item.account_class_id) : onImportedClassChange(item, item.account_class_id)"
+                                                                class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500">
+                                                            <option value="">Select class</option>
+                                                            <template x-for="ac in accountClasses" :key="ac.id">
+                                                                <option :value="String(ac.id)" :selected="String(item.account_class_id) === String(ac.id)" x-text="ac.name"></option>
+                                                            </template>
+                                                        </select>
+                                                    </td>
+
+                                                    <!-- Account Subclass (Dropdown - always editable for imported items) -->
+                                                    <td class="px-2 py-2">
+                                                        <select x-model="item.account_subclass_id"
+                                                                @change="parentScope ? parentScope.onImportedSubclassChange(item, item.account_subclass_id) : onImportedSubclassChange(item, item.account_subclass_id)"
+                                                                :disabled="!item.account_class_id"
+                                                                class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                                                            <option value="">Select subclass</option>
+                                                            <template x-for="sc in getAvailableSubclasses(item.account_class_id)" :key="sc.id">
+                                                                <option :value="String(sc.id)" :selected="String(item.account_subclass_id) === String(sc.id)" x-text="sc.name"></option>
+                                                            </template>
+                                                        </select>
+                                                    </td>
+
+                                                    <!-- Account Type (Combobox - always editable for imported items) -->
+                                                    <td class="px-2 py-2">
+                                                        <div x-data="{
+                                                            item: item,
+                                                            accountTypes: accountTypes,
+                                                            parentScope: parentScope,
+                                                            open: false,
+                                                            searchText: '',
+                                                            filteredOptions: [],
+                                                            init() {
+                                                                this.updateDisplay();
+                                                                this.updateFilteredOptions();
+
+                                                                this.$watch('item.account_subclass_id', () => {
+                                                                    this.updateFilteredOptions();
+                                                                    if (!this.item.account_subclass_id) {
+                                                                        this.item.account_type_id = '';
+                                                                        this.item.account_type_name = '';
+                                                                        this.searchText = '';
+                                                                    }
+                                                                });
+
+                                                                this.$watch('item.account_type_name', () => {
+                                                                    this.updateDisplay();
+                                                                });
+
+                                                                this.$watch('searchText', (value) => {
+                                                                    this.updateFilteredOptions();
+                                                                    if (value) {
+                                                                        const exactMatch = this.filteredOptions.find(t =>
+                                                                            t.name.toLowerCase() === value.toLowerCase()
+                                                                        );
+                                                                        if (!exactMatch && this.item.account_subclass_id) {
+                                                                            this.item.account_type_name = value;
+                                                                            this.item.account_type_id = '';
+                                                                            if (this.parentScope && this.parentScope.updateImportedAccountCodeDebounced) {
+                                                                                this.parentScope.updateImportedAccountCodeDebounced(this.item);
+                                                                            }
+                                                                        }
+                                                                    } else {
+                                                                        this.item.account_type_name = '';
+                                                                        this.item.account_type_id = '';
+                                                                        if (this.item.account_class_id && this.item.account_subclass_id) {
+                                                                            if (this.parentScope && this.parentScope.updateImportedAccountCodeDebounced) {
+                                                                                this.parentScope.updateImportedAccountCodeDebounced(this.item);
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                });
+                                                            },
+                                                            updateDisplay() {
+                                                                if (this.item.account_type_id) {
+                                                                    const selected = this.accountTypes.find(t => t.id === this.item.account_type_id);
+                                                                    if (selected) {
+                                                                        this.searchText = selected.name;
+                                                                    }
+                                                                } else if (this.item.account_type_name) {
+                                                                    this.searchText = this.item.account_type_name;
+                                                                } else {
+                                                                    this.searchText = '';
+                                                                }
+                                                            },
+                                                            updateFilteredOptions() {
+                                                                if (!this.item.account_subclass_id) {
+                                                                    this.filteredOptions = [];
+                                                                    return;
+                                                                }
+                                                                this.filteredOptions = this.accountTypes.filter(t =>
+                                                                    t.account_subclass_id === this.item.account_subclass_id
+                                                                );
+
+                                                                if (this.searchText) {
+                                                                    this.filteredOptions = this.filteredOptions.filter(t =>
+                                                                        t.name.toLowerCase().includes(this.searchText.toLowerCase())
+                                                                    );
+                                                                }
+                                                            },
+                                                            selectOption(option) {
+                                                                if (this.parentScope && this.parentScope.onImportedTypeChange) {
+                                                                    this.parentScope.onImportedTypeChange(this.item, option.id);
+                                                                }
+                                                                this.searchText = option.name;
+                                                                this.open = false;
+                                                            }
+                                                        }" x-init="init()">
+                                                            <div class="relative">
+                                                                <input type="text"
+                                                                       x-model="searchText"
+                                                                       @click.stop="open = !open; if (!open) updateFilteredOptions();"
+                                                                       @focus="open = true; updateFilteredOptions();"
+                                                                       @keydown.escape="open = false"
+                                                                       @blur="setTimeout(() => { open = false; }, 200); if (parentScope && parentScope.updateImportedAccountCodeOnBlur) parentScope.updateImportedAccountCodeOnBlur(item);"
+                                                                       :disabled="!item.account_subclass_id"
+                                                                       class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                                       placeholder="Type or select">
+                                                                <div x-show="open && filteredOptions.length > 0"
+                                                                     x-transition:enter="transition ease-out duration-100"
+                                                                     x-transition:enter-start="transform opacity-0 scale-95"
+                                                                     x-transition:enter-end="transform opacity-100 scale-100"
+                                                                     x-transition:leave="transition ease-in duration-75"
+                                                                     x-transition:leave-start="transform opacity-100 scale-100"
+                                                                     x-transition:leave-end="transform opacity-0 scale-95"
+                                                                     @click.outside="open = false"
+                                                                     @click.stop
+                                                                     class="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded shadow-lg max-h-48 overflow-y-auto">
+                                                                    <template x-for="option in filteredOptions" :key="option.id">
+                                                                        <div @click="selectOption(option); $event.stopPropagation();"
+                                                                             :class="{ 'bg-gray-100 dark:bg-gray-700': item.account_type_id === option.id }"
+                                                                             class="px-2 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100"
+                                                                             x-text="option.name"></div>
+                                                                    </template>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+
+                                                    <!-- Account Subtype -->
+                                                    <td class="px-2 py-2">
+                                                        <input type="text"
+                                                               x-model="item.account_subtype_name"
+                                                               @input="parentScope ? parentScope.updateImportedAccountCodeDebounced(item) : updateImportedAccountCodeDebounced(item);"
+                                                               @blur="parentScope ? parentScope.updateImportedAccountCodeOnBlur(item) : updateImportedAccountCodeOnBlur(item);"
+                                                               :disabled="!item.account_type_id && !item.account_type_name"
+                                                               class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                               placeholder="Enter subtype">
+                                                    </td>
+
+                                                    <!-- Normal Balance -->
+                                                    <td class="px-2 py-2">
+                                                        <select x-model="item.normal_balance"
+                                                                @change="item.normal_balance_label = formatBalance(item.normal_balance); updateImportedSelectedCoaItems();"
+                                                                class="text-xs w-full px-2 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:ring-1 focus:ring-primary-500 focus:border-primary-500">
+                                                            <option value="debit">Debit</option>
+                                                            <option value="credit">Credit</option>
+                                                        </select>
+                                                    </td>
+
+                                                    <!-- Amount (only show if mapped) -->
+                                                    <td class="px-2 py-2" x-show="csvMappings.amount">
+                                                        <span class="text-xs text-gray-700 dark:text-gray-300" x-text="item.amount || '-'"></span>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
                                 </div>
 
-                                <!-- Right Column: Imported File Headers -->
-                                <div class="bg-white dark:bg-gray-900 p-4">
-                                    <h5 class="text-xs font-semibold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-4">Imported File Headers</h5>
-                                    <div class="space-y-3">
-                                        <!-- Account Name -->
-                                        <select id="coa_mapping_account_name" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                            <option value="">Select</option>
-                                        </select>
-
-                                        <!-- Account Subtype -->
-                                        <select id="coa_mapping_account_subtype" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                            <option value="">Select</option>
-                                        </select>
-
-                                        <!-- Account Type -->
-                                        <select id="coa_mapping_account_type" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                            <option value="">Select</option>
-                                        </select>
-
-                                        <!-- Account Subclass -->
-                                        <select id="coa_mapping_account_subclass" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                            <option value="">Select</option>
-                                        </select>
-
-                                        <!-- Account Class -->
-                                        <select id="coa_mapping_account_class" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                            <option value="">Select</option>
-                                        </select>
-
-                                        <!-- Normal Balance -->
-                                        <select id="coa_mapping_normal_balance" class="w-full h-9 px-2 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500">
-                                            <option value="">Select</option>
-                                        </select>
-                                    </div>
-                                </div>
+                                <!-- Empty State -->
+                                <p x-show="importedCoaPreview.length === 0" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                                    No imported accounts to display. Please go back and complete the mapping.
+                                </p>
                             </div>
                         </div>
                     </div>
